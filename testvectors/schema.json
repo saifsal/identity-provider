@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/idp/testvectors/schema.json",
+  "title": "idp JOSE test vector",
+  "description": "One verification case: a token, the keys and policy to verify it with, and the expected verdict. Every implementation must produce exactly this verdict. See docs/adr/0002-vectors-are-the-contract.md and docs/adr/0003-verifier-check-order.md.",
+  "type": "object",
+  "required": ["id", "source", "jwks", "policy", "token", "expect"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "description": "Unique, stable identifier. Must equal the file name without the .json extension. Prefix with 'rfc' for RFC cases and 'neg-' for generated negative cases.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "source": {
+      "description": "Where the case comes from: an RFC reference such as 'RFC 8037 Appendix A.4', or the literal 'generated'.",
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "description": "One sentence on what the case exercises.",
+      "type": "string"
+    },
+    "jwks": {
+      "description": "Keys available to the verifier. Test keys only. Never place real key material in this directory.",
+      "type": "object",
+      "required": ["keys"],
+      "additionalProperties": false,
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/jwk" }
+        }
+      }
+    },
+    "policy": { "$ref": "#/$defs/policy" },
+    "token": {
+      "description": "The exact bytes handed to the verifier on stdin. May be malformed on purpose, so no pattern is enforced here.",
+      "type": "string"
+    },
+    "expect": { "$ref": "#/$defs/expect" }
+  },
+
+  "$defs": {
+    "alg": {
+      "description": "Signature algorithms known to the test suite. HS256 exists only so the RFC 7515 vector can pass and is never enabled by default.",
+      "enum": ["EdDSA", "ES256", "HS256"]
+    },
+
+    "errorCode": {
+      "description": "Closed error taxonomy. Adding a code requires an amendment to ADR 0003.",
+      "enum": [
+        "malformed",
+        "too_large",
+        "alg_not_allowed",
+        "crit_unsupported",
+        "typ_mismatch",
+        "key_not_found",
+        "bad_signature",
+        "expired",
+        "not_yet_valid",
+        "wrong_issuer",
+        "wrong_audience"
+      ]
+    },
+
+    "jwk": {
+      "description": "A JWK as it would appear in a JWKS. Members are validated by the verifiers, not by this schema, so invalid keys can be used as negative cases.",
+      "type": "object",
+      "required": ["kty"],
+      "properties": {
+        "kty": { "enum": ["OKP", "EC", "oct"] },
+        "kid": { "type": "string" },
+        "alg": { "type": "string" },
+        "use": { "type": "string" },
+        "crv": { "type": "string" },
+        "x": { "type": "string" },
+        "y": { "type": "string" },
+        "k": { "type": "string" }
+      }
+    },
+
+    "policy": {
+      "description": "Verification policy. 'iss' and 'aud' are checked only when present. 'now' is explicit so no case depends on the wall clock.",
+      "type": "object",
+      "required": ["algs", "now"],
+      "additionalProperties": false,
+      "properties": {
+        "iss": { "type": "string" },
+        "aud": { "type": "string" },
+        "algs": {
+          "description": "Algorithm allowlist. The token's header never extends it.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/alg" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "now": {
+          "description": "Verification time as seconds since the Unix epoch.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "leeway": {
+          "description": "Clock skew allowance in seconds.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "typ": {
+          "description": "Required header 'typ'. When absent, 'typ' is not checked.",
+          "type": "string"
+        },
+        "max_token_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8192
+        }
+      }
+    },
+
+    "expect": {
+      "description": "The expected verdict. For rejections the error code must match exactly. Alternatives are not allowed.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["ok"],
+          "additionalProperties": false,
+          "properties": {
+            "ok": { "const": true },
+            "kid": { "type": "string" },
+            "alg": { "$ref": "#/$defs/alg" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["ok", "error"],
+          "additionalProperties": false,
+          "properties": {
+            "ok": { "const": false },
+            "error": { "$ref": "#/$defs/errorCode" }
+          }
+        }
+      ]
+    }
+  }
+}
