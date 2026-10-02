@@ -22,7 +22,7 @@ fails.
 |---|---|---|
 | 1 | Token length is at most `max_token_bytes` | `too_large` |
 | 2 | Exactly three segments separated by `.`, each non-empty, each using only the base64url alphabet (`A-Z a-z 0-9 - _`), with no `=` padding | `malformed` |
-| 3 | Header segment decodes (length mod 4 is not 1) | `malformed` |
+| 3 | Header segment decodes as canonical base64url (length mod 4 is not 1, trailing bits are zero) | `malformed` |
 | 4 | Header is a JSON object with no duplicate member names | `malformed` |
 | 5 | If `crit` is present: it must be a non-empty array of strings, otherwise `malformed`. Any entry at all is unsupported | `malformed` / `crit_unsupported` |
 | 6 | `alg` is a string and is in `policy.algs` | `alg_not_allowed` |
@@ -80,6 +80,20 @@ fails.
 - When the policy omits `iss` or `aud`, that check is skipped. The RFC 7515
   Appendix A.1 token carries no `aud`, so its vector relies on this.
 
+### Base64url decoding is canonical
+
+A segment must be the canonical encoding of the bytes it decodes to: when the length
+is not a multiple of 4, the unused trailing bits of the last character must be zero.
+Without this rule, several different strings decode to the same bytes (for example
+`Zg`, `Zh`, `Zi` and `Zj` all decode to `f`), so a token's signature segment could be
+altered without changing the decoded signature. The signature still verifies, but the
+token string differs, which breaks anything that keys on the token text (caches,
+revocation lists, logs).
+
+The failure is reported by the step that decodes the segment: `malformed` for the
+header (step 3) and the payload (step 10), and `bad_signature` for the signature
+(step 9).
+
 ### Header rules
 
 - `typ` comparison: both sides are compared case-insensitively after removing one
@@ -115,6 +129,8 @@ Each of these has a vector with exactly the code shown. This is a floor.
 | `neg-crit-empty` | `malformed` |
 | `neg-jku-ignored` | `key_not_found` |
 | `neg-padding`, `neg-nonalphabet`, `neg-extra-segment`, `neg-empty-segment` | `malformed` |
+| `neg-b64-noncanonical-header`, `neg-b64-noncanonical-payload` | `malformed` |
+| `neg-b64-noncanonical-signature` | `bad_signature` |
 | `neg-dup-key-header`, `neg-dup-key-payload` | `malformed` |
 | `neg-exp-string`, `neg-exp-fractional`, `neg-exp-missing` | `malformed` |
 | `neg-too-large` | `too_large` |

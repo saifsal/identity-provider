@@ -1,0 +1,9 @@
+[package]
+name = "jose"
+version = "0.1.0"
+edition = "2021"
+description = "Hand-written JOSE layer (JWS, JWK, thumbprints) for identity-provider project. Educational use only."
+publish = false
+
+[dependencies]
+ring = "0.17"
