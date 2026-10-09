@@ -33,6 +33,12 @@ disagreement between implementations visible.
 This README describes the intended design. Sections marked are not
 implemented yet.
 
+M0 implementation is underway in the Rust JOSE crate: strict base64url and JSON
+parsing, JWK/JWKS parsing and thumbprints, signature verification, and compact
+JWS/JWT verification with header and claim checks are implemented. Rust signing
+and CLI support, shared RFC/generated test vectors, the Zig verifier, and the Go
+differential harness are still outstanding.
+
 ## Architecture
 
 | Language | Component | Why this language |
