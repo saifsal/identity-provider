@@ -7,7 +7,7 @@
 use ring::{hmac, signature};
 use std::fmt;
 
-use crate::alg::Alg;
+use crate::alg::{Alg, HS256_MIN_KEY_LEN};
 use crate::jwk::PublicKey;
 use crate::jwks::KeyMaterial;
 
@@ -48,12 +48,14 @@ pub fn verify(
                 .verify(signing_input, signature_bytes)
                 .map_err(|_| SignatureError)
         }
-        (Alg::HS256, KeyMaterial::Secret(secret)) => hmac::verify(
-            &hmac::Key::new(hmac::HMAC_SHA256, secret),
-            signing_input,
-            signature_bytes,
-        )
-        .map_err(|_| SignatureError),
+        (Alg::HS256, KeyMaterial::Secret(secret)) if secret.len() >= HS256_MIN_KEY_LEN => {
+            hmac::verify(
+                &hmac::Key::new(hmac::HMAC_SHA256, secret),
+                signing_input,
+                signature_bytes,
+            )
+            .map_err(|_| SignatureError)
+        }
         _ => Err(SignatureError),
     }
 }
@@ -109,12 +111,13 @@ mod tests {
 
     #[test]
     fn verifies_hs256_signature() {
-        let key = hmac::Key::new(hmac::HMAC_SHA256, b"Jefe");
+        let secret = [0x42; HS256_MIN_KEY_LEN];
+        let key = hmac::Key::new(hmac::HMAC_SHA256, &secret);
         let sig = hmac::sign(&key, b"what do ya want for nothing?");
 
         verify(
             Alg::HS256,
-            &KeyMaterial::Secret(b"Jefe".to_vec()),
+            &KeyMaterial::Secret(secret.to_vec()),
             b"what do ya want for nothing?",
             sig.as_ref(),
         )
@@ -123,13 +126,14 @@ mod tests {
 
     #[test]
     fn rejects_tampered_input_and_wrong_key_type() {
-        let key = hmac::Key::new(hmac::HMAC_SHA256, b"secret");
+        let secret = [0x42; HS256_MIN_KEY_LEN];
+        let key = hmac::Key::new(hmac::HMAC_SHA256, &secret);
         let sig = hmac::sign(&key, INPUT);
 
         assert_eq!(
             verify(
                 Alg::HS256,
-                &KeyMaterial::Secret(b"secret".to_vec()),
+                &KeyMaterial::Secret(secret.to_vec()),
                 b"tampered",
                 sig.as_ref(),
             ),
@@ -138,7 +142,23 @@ mod tests {
         assert_eq!(
             verify(
                 Alg::EdDSA,
-                &KeyMaterial::Secret(b"secret".to_vec()),
+                &KeyMaterial::Secret(secret.to_vec()),
+                INPUT,
+                sig.as_ref(),
+            ),
+            Err(SignatureError)
+        );
+    }
+
+    #[test]
+    fn rejects_hs256_keys_shorter_than_256_bits() {
+        let secret = [0x42; HS256_MIN_KEY_LEN - 1];
+        let key = hmac::Key::new(hmac::HMAC_SHA256, &secret);
+        let sig = hmac::sign(&key, INPUT);
+        assert_eq!(
+            verify(
+                Alg::HS256,
+                &KeyMaterial::Secret(secret.to_vec()),
                 INPUT,
                 sig.as_ref(),
             ),

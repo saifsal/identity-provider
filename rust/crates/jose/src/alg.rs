@@ -6,6 +6,9 @@
 
 use std::fmt;
 
+/// RFC 7518 section 3.2 requires HS256 keys to be at least 256 bits.
+pub const HS256_MIN_KEY_LEN: usize = 32;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Alg {
     EdDSA,

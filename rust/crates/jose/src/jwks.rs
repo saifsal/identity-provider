@@ -22,7 +22,7 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use crate::alg::Alg;
+use crate::alg::{Alg, HS256_MIN_KEY_LEN};
 use crate::b64url;
 use crate::json::{self, JsonError, Value};
 use crate::jwk::PublicKey;
@@ -260,7 +260,7 @@ fn load_material(entry: &Value) -> Option<KeyMaterial> {
         }
         "oct" => {
             let k = member_bytes(entry, "k")?;
-            if k.is_empty() {
+            if k.len() < HS256_MIN_KEY_LEN {
                 None
             } else {
                 Some(KeyMaterial::Secret(k))
@@ -441,8 +441,12 @@ mod tests {
             format!(r#"{{"kid":"noy","kty":"EC","crv":"P-256","x":"{P_X}"}}"#),
             r#"{"kid":"nok","kty":"oct"}"#.to_string(),
             r#"{"kid":"nokty"}"#.to_string(),
-            // Empty secret.
+            // HS256 secrets shorter than 256 bits.
             r#"{"kid":"empty","kty":"oct","k":""}"#.to_string(),
+            format!(
+                r#"{{"kid":"short-secret","kty":"oct","k":"{}"}}"#,
+                b64url::encode(&[0x42; HS256_MIN_KEY_LEN - 1])
+            ),
             // Members of the wrong JSON type.
             r#"{"kid":"num","kty":"oct","k":5}"#.to_string(),
             r#"{"kid":"ktynum","kty":1}"#.to_string(),

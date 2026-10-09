@@ -229,6 +229,8 @@ mod tests {
     use super::*;
     use ring::hmac;
 
+    use crate::alg::HS256_MIN_KEY_LEN;
+
     fn policy() -> Policy {
         Policy {
             algorithms: vec![Alg::HS256],
@@ -245,13 +247,14 @@ mod tests {
         let header = b64url::encode(header.as_bytes());
         let payload = b64url::encode(payload.as_bytes());
         let input = format!("{header}.{payload}");
-        let key = hmac::Key::new(hmac::HMAC_SHA256, b"secret");
+        let secret = [0x42; HS256_MIN_KEY_LEN];
+        let key = hmac::Key::new(hmac::HMAC_SHA256, &secret);
         let signature = b64url::encode(hmac::sign(&key, input.as_bytes()).as_ref());
         format!("{input}.{signature}")
     }
 
     fn jwks() -> Jwks {
-        let secret = b64url::encode(b"secret");
+        let secret = b64url::encode(&[0x42; HS256_MIN_KEY_LEN]);
         Jwks::parse(format!(r#"{{"keys":[{{"kty":"oct","kid":"h","k":"{secret}"}}]}}"#).as_bytes())
             .expect("valid JWKS")
     }
