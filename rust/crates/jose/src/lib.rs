@@ -5,3 +5,4 @@ pub mod b64url;
 pub mod json;
 pub mod jwk;
 pub mod jwks;
+pub mod signature;
