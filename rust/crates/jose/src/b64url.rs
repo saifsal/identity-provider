@@ -57,15 +57,15 @@ fn sextet(n: u32, shift: u32) -> char {
 /// Encodes `input` as unpadded base64url.
 pub fn encode(input: &[u8]) -> String {
     let mut out = String::with_capacity(encoded_len(input.len()));
-    let mut chunks = input.chunks_exact(3);
-    for c in &mut chunks {
+    let (chunks, remainder) = input.as_chunks::<3>();
+    for c in chunks {
         let n = ((c[0] as u32) << 16) | ((c[1] as u32) << 8) | (c[2] as u32);
         out.push(sextet(n, 18));
         out.push(sextet(n, 12));
         out.push(sextet(n, 6));
         out.push(sextet(n, 0));
     }
-    match chunks.remainder() {
+    match remainder {
         [a] => {
             let n = (*a as u32) << 16;
             out.push(sextet(n, 18));
@@ -109,13 +109,13 @@ pub fn decode(input: &str) -> Result<Vec<u8>, DecodeError> {
     }
 
     let mut out = Vec::with_capacity(vals.len() / 4 * 3 + 2);
-    let mut chunks = vals.chunks_exact(4);
-    for c in &mut chunks {
+    let (chunks, remainder) = vals.as_chunks::<4>();
+    for c in chunks {
         let n =
             ((c[0] as u32) << 18) | ((c[1] as u32) << 12) | ((c[2] as u32) << 6) | (c[3] as u32);
         out.extend_from_slice(&[(n >> 16) as u8, (n >> 8) as u8, n as u8]);
     }
-    match chunks.remainder() {
+    match remainder {
         [a, b] => {
             if b & 0x0f != 0 {
                 return Err(DecodeError::NonCanonical);
