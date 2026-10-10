@@ -5,12 +5,18 @@ use std::fmt;
 use ring::signature::{self, EcdsaKeyPair, Ed25519KeyPair};
 
 use crate::alg::Alg;
+use crate::b64url;
+use crate::json::{self, Value};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SigningError {
     UnsupportedAlgorithm,
     InvalidKey,
     SigningFailed,
+    InvalidProtectedHeader,
+    AlgorithmMismatch,
+    UnsupportedCriticalHeader,
+    InvalidPayload,
 }
 
 impl fmt::Display for SigningError {
@@ -21,6 +27,16 @@ impl fmt::Display for SigningError {
             }
             SigningError::InvalidKey => f.write_str("invalid PKCS#8 signing key"),
             SigningError::SigningFailed => f.write_str("signature generation failed"),
+            SigningError::InvalidProtectedHeader => {
+                f.write_str("protected header must be a valid JSON object with a string kid")
+            }
+            SigningError::AlgorithmMismatch => {
+                f.write_str("protected header alg does not match signing algorithm")
+            }
+            SigningError::UnsupportedCriticalHeader => {
+                f.write_str("critical protected-header parameters are unsupported")
+            }
+            SigningError::InvalidPayload => f.write_str("payload must be a valid JSON object"),
         }
     }
 }
@@ -52,12 +68,57 @@ pub fn sign(alg: Alg, pkcs8: &[u8], signing_input: &[u8]) -> Result<Vec<u8>, Sig
     }
 }
 
+/// Creates a compact JWS carrying a JSON object payload.
+///
+/// The protected header is preserved byte-for-byte and must be a strict JSON
+/// object containing string `alg` and non-empty string `kid` members. Its
+/// algorithm must match `alg`. The payload must be a strict JSON object. This
+/// lets the caller choose header fields while ensuring the result matches the
+/// project's compact JWT verifier profile.
+pub fn sign_compact(
+    alg: Alg,
+    pkcs8: &[u8],
+    protected_header_json: &[u8],
+    payload_json: &[u8],
+) -> Result<String, SigningError> {
+    let header =
+        json::parse(protected_header_json).map_err(|_| SigningError::InvalidProtectedHeader)?;
+    if header.as_object().is_none()
+        || header.get("alg").and_then(Value::as_str).is_none()
+        || header
+            .get("kid")
+            .and_then(Value::as_str)
+            .is_none_or(str::is_empty)
+    {
+        return Err(SigningError::InvalidProtectedHeader);
+    }
+    if header.get("alg").and_then(Value::as_str) != Some(alg.name()) {
+        return Err(SigningError::AlgorithmMismatch);
+    }
+    if header.get("crit").is_some() {
+        return Err(SigningError::UnsupportedCriticalHeader);
+    }
+
+    let payload = json::parse(payload_json).map_err(|_| SigningError::InvalidPayload)?;
+    if payload.as_object().is_none() {
+        return Err(SigningError::InvalidPayload);
+    }
+
+    let encoded_header = b64url::encode(protected_header_json);
+    let encoded_payload = b64url::encode(payload_json);
+    let signing_input = format!("{encoded_header}.{encoded_payload}");
+    let signature = sign(alg, pkcs8, signing_input.as_bytes())?;
+    Ok(format!("{signing_input}.{}", b64url::encode(&signature)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::jwk::PublicKey;
+    use crate::jwks::Jwks;
     use crate::jwks::KeyMaterial;
     use crate::signature as jws_signature;
+    use crate::verify::{self, Policy};
     use ring::rand::SystemRandom;
     use ring::signature::KeyPair;
 
@@ -107,6 +168,93 @@ mod tests {
         assert_eq!(
             sign(Alg::EdDSA, b"not a key", INPUT),
             Err(SigningError::InvalidKey)
+        );
+    }
+
+    #[test]
+    fn creates_compact_jwt_that_verifies() {
+        let rng = SystemRandom::new();
+        let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).expect("generate Ed25519 key");
+        let pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).expect("parse Ed25519 key");
+        let public = PublicKey::ed25519_from_bytes(pair.public_key().as_ref())
+            .expect("valid Ed25519 public key");
+        let kid = public.thumbprint();
+        let jwks = Jwks::parse(
+            format!(
+                r#"{{"keys":[{{"kty":"OKP","crv":"Ed25519","x":"{}","kid":"{}"}}]}}"#,
+                crate::b64url::encode(pair.public_key().as_ref()),
+                kid,
+            )
+            .as_bytes(),
+        )
+        .expect("valid JWKS");
+        let header = format!(r#"{{"alg":"EdDSA","kid":"{kid}","typ":"at+jwt"}}"#);
+        let payload = r#"{"iss":"issuer","aud":"api","exp":101}"#;
+        let token = sign_compact(
+            Alg::EdDSA,
+            pkcs8.as_ref(),
+            header.as_bytes(),
+            payload.as_bytes(),
+        )
+        .expect("sign compact JWT");
+
+        let verified = verify::verify(
+            token.as_bytes(),
+            &jwks,
+            &Policy {
+                algorithms: vec![Alg::EdDSA],
+                issuer: Some("issuer".into()),
+                audience: Some("api".into()),
+                now: 100,
+                leeway: 0,
+                typ: Some("at+jwt".into()),
+                max_token_bytes: 8192,
+            },
+        )
+        .expect("newly signed JWT verifies");
+        assert_eq!(verified.kid, kid);
+        assert_eq!(verified.alg, Alg::EdDSA);
+    }
+
+    #[test]
+    fn compact_signing_rejects_invalid_header_algorithm_and_payload() {
+        let rng = SystemRandom::new();
+        let pkcs8 = Ed25519KeyPair::generate_pkcs8(&rng).expect("generate Ed25519 key");
+        assert_eq!(
+            sign_compact(
+                Alg::EdDSA,
+                pkcs8.as_ref(),
+                br#"{"alg":"ES256","kid":"key"}"#,
+                br#"{"exp":101}"#,
+            ),
+            Err(SigningError::AlgorithmMismatch)
+        );
+        assert_eq!(
+            sign_compact(
+                Alg::EdDSA,
+                pkcs8.as_ref(),
+                br#"{"alg":"EdDSA"}"#,
+                br#"{"exp":101}"#,
+            ),
+            Err(SigningError::InvalidProtectedHeader)
+        );
+        assert_eq!(
+            sign_compact(
+                Alg::EdDSA,
+                pkcs8.as_ref(),
+                br#"{"alg":"EdDSA","kid":"key"}"#,
+                b"[]",
+            ),
+            Err(SigningError::InvalidPayload)
+        );
+        assert_eq!(
+            sign_compact(
+                Alg::EdDSA,
+                pkcs8.as_ref(),
+                br#"{"alg":"EdDSA","kid":"key","crit":["exp"]}"#,
+                br#"{"exp":101}"#,
+            ),
+            Err(SigningError::UnsupportedCriticalHeader)
         );
     }
 }

@@ -18,7 +18,7 @@ all of JOSE or all JWT claims and profiles.
 
 | Specification | In-scope sections and behavior | Current evidence / remaining work |
 |---|---|---|
-| RFC 7515, JWS | Compact JWS parsing, signing, and verification; protected-header handling; signing input is the ASCII `BASE64URL(protected).BASE64URL(payload)` bytes | Rust signing primitives and compact verification exist. Shared RFC vectors and Zig verification remain. JSON JWS serialization and detached payloads are out of scope. |
+| RFC 7515, JWS | Compact JWS parsing, signing, and verification; protected-header handling; signing input is the ASCII `BASE64URL(protected).BASE64URL(payload)` bytes | Rust compact signing and verification exist for JSON JWT payloads. Shared RFC vectors and Zig verification remain. JSON JWS serialization and detached payloads are out of scope. |
 | RFC 7517, JWK | Public `OKP`/`Ed25519` and `EC`/`P-256` keys; `oct` keys only for HS256 verification | Rust parses these key types for the verifier. Private-key import/export, key use beyond signature verification, and other key types are out of scope. Shared-vector confirmation remains. |
 | RFC 7517, JWKS | Parse a configured `keys` array and select one key by exact `kid` | Rust parsing and selection exist. Duplicate `kid` is a configuration error; there is no token-directed key fetching or fallback search. CLI behavior and shared vectors remain. |
 | RFC 7518, JWA | HS256 verification only; ES256 verification with P-256 and fixed-width 64-byte signatures formed by concatenating the 32-byte R and S values | Rust enforces the 256-bit minimum HS256 key length in JWKS parsing and signature verification. Shared vectors and cross-implementation confirmation remain. |
