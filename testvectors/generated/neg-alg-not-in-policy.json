@@ -1,0 +1,17 @@
+{
+  "id": "neg-alg-not-in-policy",
+  "source": "generated",
+  "description": "Rejects token algorithm that is outside policy.algs.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": ["EdDSA"],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImsxIn0.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "alg_not_allowed"
+  }
+}

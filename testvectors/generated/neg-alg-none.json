@@ -1,0 +1,17 @@
+{
+  "id": "neg-alg-none",
+  "source": "generated",
+  "description": "Rejects alg=none at policy allowlist check.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": ["EdDSA"],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJub25lIiwia2lkIjoiazEifQ.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "alg_not_allowed"
+  }
+}

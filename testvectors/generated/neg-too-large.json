@@ -1,0 +1,18 @@
+{
+  "id": "neg-too-large",
+  "source": "generated",
+  "description": "Rejects a token whose byte length exceeds max_token_bytes.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": ["EdDSA"],
+    "now": 0,
+    "max_token_bytes": 4
+  },
+  "token": "a.a.a",
+  "expect": {
+    "ok": false,
+    "error": "too_large"
+  }
+}

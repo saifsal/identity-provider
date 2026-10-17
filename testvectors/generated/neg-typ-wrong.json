@@ -1,0 +1,18 @@
+{
+  "id": "neg-typ-wrong",
+  "source": "generated",
+  "description": "Rejects a mismatched typ header before key lookup.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": ["EdDSA"],
+    "now": 0,
+    "typ": "at+jwt"
+  },
+  "token": "eyJhbGciOiJFZERTQSIsInR5cCI6Imp3dCJ9.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "typ_mismatch"
+  }
+}
