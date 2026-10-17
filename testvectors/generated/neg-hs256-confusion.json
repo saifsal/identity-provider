@@ -1,0 +1,26 @@
+{
+  "id": "neg-hs256-confusion",
+  "source": "generated",
+  "description": "Rejects HS256 naming an EdDSA key at the allowlist, before key use.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImsxIn0.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "alg_not_allowed"
+  }
+}

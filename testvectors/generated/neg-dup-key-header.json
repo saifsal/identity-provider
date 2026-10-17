@@ -1,0 +1,19 @@
+{
+  "id": "neg-dup-key-header",
+  "source": "generated",
+  "description": "Rejects duplicate member names in the header.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImFsZyI6IkVkRFNBIiwia2lkIjoiazEifQ.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

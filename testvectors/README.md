@@ -8,3 +8,16 @@ This directory is the M0 verifier contract described by
 - `generated/` is for project-generated vectors (negative and boundary cases).
 
 Each case is one JSON file. The file name must equal the vector `id`.
+
+The Rust verifier runs every case under `generated/` and `rfc/`:
+
+```bash
+cd rust
+cargo test -p jose --test vectors
+```
+
+That harness (`rust/crates/jose/tests/vectors.rs`) fails if no vectors are
+found, if an `id` does not match its file name, or if a verdict differs —
+rejections must match on the exact error code. Cases that need a valid
+signature (claims, tampering, boundary times) and the RFC corpus are not
+written yet; the Zig verifier and Go harness will run the same files.

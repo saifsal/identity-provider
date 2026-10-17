@@ -1,0 +1,19 @@
+{
+  "id": "neg-jku-ignored",
+  "source": "generated",
+  "description": "Ignores jku; keys come only from the configured JWKS.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImprdSI6Imh0dHBzOi8vZXhhbXBsZS5pbnZhbGlkL2p3a3MuanNvbiIsImtpZCI6ImsxIn0.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "key_not_found"
+  }
+}

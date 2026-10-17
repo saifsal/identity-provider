@@ -1,0 +1,27 @@
+{
+  "id": "neg-key-alg-mismatch",
+  "source": "generated",
+  "description": "Rejects a key whose alg member disagrees with the header alg.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1",
+        "alg": "ES256"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "key_not_found"
+  }
+}

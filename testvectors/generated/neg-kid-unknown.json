@@ -1,0 +1,26 @@
+{
+  "id": "neg-kid-unknown",
+  "source": "generated",
+  "description": "Rejects a kid that is not in the JWKS.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6InVua25vd24ifQ.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "key_not_found"
+  }
+}

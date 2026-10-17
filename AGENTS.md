@@ -34,7 +34,8 @@ The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md)
 │       │   ├── signature.rs               # signature verification
 │       │   ├── signing.rs                 # EdDSA and ES256 signing; compact JWS
 │       │   └── verify.rs                  # compact JWS/JWT verification and claims
-│       └── tests/thumbprint.rs            # RFC 8037 Appendix A thumbprint vectors
+│       ├── tests/thumbprint.rs            # RFC 8037 Appendix A thumbprint vectors
+│       └── tests/vectors.rs               # runs testvectors/ against the Rust verifier
 ├── testvectors/
 │   ├── generated/                         # seed generated vectors (incomplete set)
 │   ├── rfc/                               # RFC-derived vectors (not populated yet)
@@ -75,7 +76,7 @@ cargo test --workspace
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-All three succeeded on `rustc 1.99.0` (`cargo +stable` from `rust/`). `cargo test --workspace` ran 69 unit tests, 8 integration tests in `tests/thumbprint.rs`, and 0 doc-tests.
+All three succeeded on `rustc 1.99.0` (`cargo +stable` from `rust/`). `cargo test --workspace` ran 69 unit tests, 8 integration tests in `tests/thumbprint.rs`, 1 vector-suite test in `tests/vectors.rs` (which loops over every file under `testvectors/`), and 0 doc-tests.
 
 Run one integration test, or that test file:
 
@@ -99,7 +100,7 @@ The first command filters every target by that name, so the library unit tests r
 - `Alg` is `EdDSA`, `ES256`, and verify-only `HS256`. `none` is not a variant. Algorithm names match case-sensitively.
 - Verification follows `docs/adr/0003-verifier-check-order.md`: size and shape, then the algorithm allowlist, then `typ` and `kid` selection, then the signature, then payload parsing and claims. The signature is checked before the payload is parsed. Keys come from the `Jwks` passed by the caller. Header `jku`, `jwk`, `x5u`, `x5c`, and `x5t` are not consulted.
 - ES256 signatures are the 64-byte JOSE `R || S` form. HS256 signing returns `SigningError::UnsupportedAlgorithm`. HS256 keys shorter than 32 bytes are rejected.
-- Module docs name the RFC or ADR they implement. Tests live in `#[cfg(test)]` modules next to the code, plus `rust/crates/jose/tests/thumbprint.rs`.
+- Module docs name the RFC or ADR they implement. Tests live in `#[cfg(test)]` modules next to the code, plus `rust/crates/jose/tests/thumbprint.rs` and `tests/vectors.rs` (the shared-vector runner; it re-serializes each vector's `jwks` with a test-local JSON writer because the crate has no serializer).
 - `Policy.now` is an explicit Unix timestamp. Tests do not read the wall clock.
 - History uses [Conventional Commits](https://www.conventionalcommits.org/), with scopes such as `feat(rust):`, `fix(rust):`, `refactor(rust):`, and `docs:`.
 
@@ -127,7 +128,7 @@ Local tooling that does exist:
 ## Gotchas
 
 - The tree is the source of truth for what runs. Design notes in the ADRs and the milestone table in the README describe Zig, Go, a CLI, and an authorization server that are not implemented.
-- `testvectors/` now includes seed files under `generated/`, but M0 conformance is still incomplete until RFC vectors are present and all implementations agree on the full suite. Unit tests are not a substitute for that suite; `docs/rfc-conformance.md` says so.
+- `testvectors/generated/` holds the pre-signature negative cases from ADR 0003 and is run against the Rust verifier by `tests/vectors.rs`. Cases needing a valid signature (claims, tampering, time boundaries), the RFC corpus under `testvectors/rfc/`, and agreement from Zig/Go are still missing, so M0 conformance is not established. Unit tests are not a substitute for that suite; `docs/rfc-conformance.md` says so.
 - `docs/threat-model.md` is not in the repository.
 - Rust older than 1.88 does not compile `b64url.rs`. A default toolchain of 1.83 fails even though `Cargo.lock` resolves.
 - `cargo test` does not start a server. There is nothing to run.
