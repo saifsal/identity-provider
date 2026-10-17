@@ -1,0 +1,27 @@
+{
+  "id": "neg-aud-array-missing",
+  "source": "generated",
+  "description": "Rejects a token whose aud array does not contain policy.aud.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100,
+    "aud": "api"
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJhdWQiOlsiYSIsImIiXSwiZXhwIjoyMDB9.UejG5QIrmZgEInhWngys4C-BgY8RTdU7QoNr6t0OXbdzVH1UHKFEiNm51KKqQM3QTBz9pAAx7vD1mOCg193hBA",
+  "expect": {
+    "ok": false,
+    "error": "wrong_audience"
+  }
+}

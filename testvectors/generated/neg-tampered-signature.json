@@ -1,0 +1,26 @@
+{
+  "id": "neg-tampered-signature",
+  "source": "generated",
+  "description": "Rejects a token whose signature bytes do not verify.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjIwMH0.Nt3JNUSjUMZRTm2Ycqesy9jgFTQp7oplZcrAOxZGjRm_X2GGT82-J_ZMSVgK1aut23n0Yb2OE15uoQyotH7xDQ",
+  "expect": {
+    "ok": false,
+    "error": "bad_signature"
+  }
+}

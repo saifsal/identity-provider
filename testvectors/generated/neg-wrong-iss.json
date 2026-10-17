@@ -1,0 +1,27 @@
+{
+  "id": "neg-wrong-iss",
+  "source": "generated",
+  "description": "Rejects a token whose iss claim does not match policy.iss.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100,
+    "iss": "https://issuer.example"
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJpc3MiOiJodHRwczovL290aGVyLmV4YW1wbGUiLCJleHAiOjIwMH0.ebwP5i5D0M6wR1xLYxaPmSAr6jxn2YXVctdnSnwL85z81w4oNRU82UaDLgtaa0ZNNZkmFVCNYGwjFU9Agv5OAw",
+  "expect": {
+    "ok": false,
+    "error": "wrong_issuer"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "id": "neg-nbf-boundary",
+  "source": "generated",
+  "description": "Rejects a token one second before nbf becomes valid.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjIwMCwibmJmIjoxMDF9.pmECSVZF79Eh84Rc2bkCLOcsIMpQDaqBGBtZ-AX3pijt8AAkIQgPDyX95EEP46JiiTsEHtRicxXJi3qyqzzrBQ",
+  "expect": {
+    "ok": false,
+    "error": "not_yet_valid"
+  }
+}

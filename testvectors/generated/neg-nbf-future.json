@@ -1,0 +1,26 @@
+{
+  "id": "neg-nbf-future",
+  "source": "generated",
+  "description": "Rejects a token whose nbf is in the future.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjIwMCwibmJmIjoxNTB9.cuuh9ScUYZJtAlhjCdhhsM7Vhvqb6R0pqHfn2_JtAMnpJwR7RWLOBfq0M0FfpAl8mOkZxGdhoBtyJ71iXV5MCA",
+  "expect": {
+    "ok": false,
+    "error": "not_yet_valid"
+  }
+}

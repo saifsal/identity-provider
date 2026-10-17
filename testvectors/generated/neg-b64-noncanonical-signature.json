@@ -1,0 +1,26 @@
+{
+  "id": "neg-b64-noncanonical-signature",
+  "source": "generated",
+  "description": "Rejects a signature segment with non-zero trailing base64url bits.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjIwMH0.N93JNUSjUMZRTm2Ycqesy9jgFTQp7oplZcrAOxZGjRm_X2GGT82-J_ZMSVgK1aut23n0Yb2OE15uoQyotH7xDR",
+  "expect": {
+    "ok": false,
+    "error": "bad_signature"
+  }
+}

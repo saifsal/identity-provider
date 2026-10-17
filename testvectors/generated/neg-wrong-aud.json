@@ -1,0 +1,27 @@
+{
+  "id": "neg-wrong-aud",
+  "source": "generated",
+  "description": "Rejects a token whose string aud claim does not match policy.aud.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100,
+    "aud": "api"
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJhdWQiOiJvdGhlci1hcGkiLCJleHAiOjIwMH0.WlBn8gTbMS-a6bYNVr8Fj46swMTmGYw5vhO5Xm3XJLvWGQhGws7YbaTWZitrOzQlhQYII3Mvd7ym9STTlev8BA",
+  "expect": {
+    "ok": false,
+    "error": "wrong_audience"
+  }
+}

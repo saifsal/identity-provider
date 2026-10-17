@@ -1,0 +1,26 @@
+{
+  "id": "neg-exp-string",
+  "source": "generated",
+  "description": "Rejects an exp claim given as a JSON string instead of an integer.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOiIyMDAifQ.8DN6c26prlmcluZRyqZzZ70Ak5rBFKhWakYk9kmNdwIPaA59bxbLmQecF0K9mO0lUc5hdxaVt14LJ7Pup7anBA",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

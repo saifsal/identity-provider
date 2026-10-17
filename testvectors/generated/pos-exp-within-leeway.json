@@ -1,0 +1,28 @@
+{
+  "id": "pos-exp-within-leeway",
+  "source": "generated",
+  "description": "Accepts a token at now == exp + leeway - 1.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 104,
+    "leeway": 10
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjk1fQ.X7yzONRbkVLz3l7sdrD04_3ltBuRdAb298NzqwzKzpi-F001Bo9M6TBdfGRn0kx-AAxUGfC3VJUXp5EF-1peDQ",
+  "expect": {
+    "ok": true,
+    "kid": "k1",
+    "alg": "EdDSA"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "pos-nbf-equal-now",
+  "source": "generated",
+  "description": "Accepts a token at the exact instant now == nbf.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjIwMCwibmJmIjoxMDB9.DlO6PTP1SfAxIfqL18xeOiqcIJQoAU7HYnSUO29ailTDIqM7JqdhuMDZ7JFehjHhWcecfy5gg8oNaFSl-j3xCA",
+  "expect": {
+    "ok": true,
+    "kid": "k1",
+    "alg": "EdDSA"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "id": "neg-sig-der-encoded",
+  "source": "generated",
+  "description": "Rejects an ASN.1 DER-encoded ECDSA signature instead of fixed-width 64-byte R || S.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+        "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
+        "kid": "p1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "ES256"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6InAxIn0.eyJleHAiOjIwMH0.MEUCIA7RIVN5Y2xIPC9_FVgH1AKjsigDOvl8fheBmsMWnqZlAiEAxQoH04w8cOXY8S2vCEpUgKZlkMXyk1Cajz9_ioOjVNU",
+  "expect": {
+    "ok": false,
+    "error": "bad_signature"
+  }
+}

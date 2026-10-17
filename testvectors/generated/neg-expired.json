@@ -1,0 +1,26 @@
+{
+  "id": "neg-expired",
+  "source": "generated",
+  "description": "Rejects a token whose exp is in the past.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjUwfQ.TKjWdVc8HzIM0xfeZwiH1xA5HYDJ3R9sZcd54f9qCrNhJJBs64AtRBSdaeLb63VboO-2mGNL8McdRT9Y_4L7Bw",
+  "expect": {
+    "ok": false,
+    "error": "expired"
+  }
+}

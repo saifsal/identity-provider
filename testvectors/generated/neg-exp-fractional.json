@@ -1,0 +1,26 @@
+{
+  "id": "neg-exp-fractional",
+  "source": "generated",
+  "description": "Rejects a fractional NumericDate exp claim.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjIwMC41fQ.lVtBU8oji2UbdlimJkqVqcxDC-YSioyby1pc3Xe0UXKtqFfru40zJQiUkyu2SnXXvKOeF_5a-s_5dxcfkF50Cg",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}
