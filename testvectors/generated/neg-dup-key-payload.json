@@ -1,0 +1,26 @@
+{
+  "id": "neg-dup-key-payload",
+  "source": "generated",
+  "description": "Rejects a validly signed token whose payload contains duplicate JSON member names.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjIwMCwiZXhwIjoyMDB9.L-Ez_zYPxu5Cv7CvbkARBlUiIGjF_r4MEsu2ItSptT9lmPsPLzddp5RvosWnF8kcLitiUC3mO3JO2_52vTbZAQ",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

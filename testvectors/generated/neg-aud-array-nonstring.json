@@ -1,0 +1,27 @@
+{
+  "id": "neg-aud-array-nonstring",
+  "source": "generated",
+  "description": "Rejects a token whose aud array contains a non-string element.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100,
+    "aud": "api"
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJhdWQiOlsiYXBpIiwxMjNdLCJleHAiOjIwMH0.GXdzL_O0YBCJHT3D9UjSx6pF6NI6qGxZHqDbjzBiT5GcW6slRIW21VTpe1arX_aCWu2tlcE9xqDiJSHgPya3Aw",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

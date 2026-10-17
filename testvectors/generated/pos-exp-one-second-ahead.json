@@ -1,0 +1,27 @@
+{
+  "id": "pos-exp-one-second-ahead",
+  "source": "generated",
+  "description": "Accepts a token whose exp is one second ahead of now.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjEwMX0.v6crgAoEo86g2X89VfNnnXvQ5xUvGG5uiGLceBYoAo8deIGLzAKtF7kG21o7EMrbSxgkVfy_LjIr-Wyr3-ScDQ",
+  "expect": {
+    "ok": true,
+    "kid": "k1",
+    "alg": "EdDSA"
+  }
+}

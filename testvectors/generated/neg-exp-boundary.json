@@ -1,0 +1,26 @@
+{
+  "id": "neg-exp-boundary",
+  "source": "generated",
+  "description": "Rejects a token at the exact instant now == exp (exp is the first invalid second).",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjEwMH0.z-XUIb8ur1jF6wD0agaD0c5NpjPj7SNiWL9aEgBzjc9psGvcqghRN0c5P0BiQL7xYODdQqwZlvp6TteXcoViBQ",
+  "expect": {
+    "ok": false,
+    "error": "expired"
+  }
+}

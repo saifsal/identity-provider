@@ -1,0 +1,26 @@
+{
+  "id": "neg-b64-noncanonical-payload",
+  "source": "generated",
+  "description": "Rejects a validly signed token whose payload segment has non-zero trailing base64url bits.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.e31.vSbU3Drgf9VsXvy-LbJmkPsb09SzFtuHrzATMx8H6Osho-yyH_PwCKchXKSN_QYVxq2H-KHQm7YlvfxDGNUvDw",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

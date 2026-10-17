@@ -1,0 +1,26 @@
+{
+  "id": "neg-exp-missing",
+  "source": "generated",
+  "description": "Rejects a token that omits the required exp claim.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "kid": "k1"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 100
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJpc3MiOiJodHRwczovL2lzc3Vlci5leGFtcGxlIn0.Gw7A0evhHKQ6S02SL0uibSeKsuHNEX_uHNEgj5hMbyTfVw1nPefkjO7yvpYmRCBMxoqugWSdQ-6QgCUCVrrVDA",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}
