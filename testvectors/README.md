@@ -14,6 +14,14 @@ The Rust verifier runs every case under `generated/` and `rfc/`:
 ```bash
 cd rust
 cargo test -p jose --test vectors
+cargo test -p jose-cli --test verify
+```
+
+Or run a single case with the CLI (after `cargo build -p jose-cli`), writing the vector's
+`jwks` and `policy` members to files and piping `token` on stdin:
+
+```bash
+./target/debug/jose-cli verify --jwks jwks.json --policy policy.json --token -
 ```
 
 That harness (`rust/crates/jose/tests/vectors.rs`) fails if no vectors are

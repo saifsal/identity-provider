@@ -4,7 +4,7 @@
 
 identity-provider is an educational OAuth 2.0 / OpenID Connect identity provider. Its purpose is to learn the protocols by implementing the layers underneath them (JOSE, token issuance, verification, and later the OAuth and OIDC flows) and to compare independent implementations of the same security-critical code with a shared test-vector contract. It has had no external review. It is not a production identity provider.
 
-Milestone M0 is in progress. The checked-in implementation is the Rust library crate `jose` at `rust/crates/jose`. That crate signs and verifies compact JWS/JWT payloads, parses JWK and JWKS documents, computes RFC 7638 thumbprints, and enforces the verifier rules in `docs/adr/0003-verifier-check-order.md`. Rust signing of EdDSA and ES256, including compact serialization, is implemented. Generated vectors covering the ADR 0003 minimum negative set and positive time-boundary cases now exist under `testvectors/generated/`. Still outstanding for M0: a `jose-cli` binary, the RFC vector corpus under `testvectors/rfc/`, a Zig verifier, and a Go differential harness. Later milestones (OAuth, OIDC, token lifecycle, authentication, control plane, federation) are planned and have no code yet.
+Milestone M0 is in progress. The checked-in implementation is the Rust library crate `jose` at `rust/crates/jose`. That crate signs and verifies compact JWS/JWT payloads, parses JWK and JWKS documents, computes RFC 7638 thumbprints, and enforces the verifier rules in `docs/adr/0003-verifier-check-order.md`. Rust signing of EdDSA and ES256, including compact serialization, is implemented. Generated vectors covering the ADR 0003 minimum negative set and positive time-boundary cases now exist under `testvectors/generated/`. Still outstanding for M0: the remaining `jose-cli` subcommands (`keygen`, `jwks`, `sign`, `gen-vectors`), the RFC vector corpus under `testvectors/rfc/`, a Zig verifier, and a Go differential harness. Later milestones (OAuth, OIDC, token lifecycle, authentication, control plane, federation) are planned and have no code yet.
 
 The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md). That document is the M0 scope, the evidence that exists today, and the completion rule: do not treat a behavior as conformant until shared vectors exercise it. Accepted decisions that constrain that work are in [`docs/adr/`](docs/adr/). The milestone list through M8 is in [`README.md`](README.md).
 
@@ -19,10 +19,10 @@ The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md)
 │   │   └── 0003-verifier-check-order.md   # exact check order and error codes
 │   └── rfc-conformance.md                 # current M0 plan and remaining work
 ├── rust/
-│   ├── Cargo.toml                         # workspace; only member is crates/jose
+│   ├── Cargo.toml                         # workspace; members jose and jose-cli
 │   ├── Cargo.lock
 │   ├── mise.toml                          # rust = "stable"
-│   └── crates/jose/
+│   ├── crates/jose/
 │       ├── Cargo.toml                     # package jose 0.1.0, edition 2021, publish = false
 │       ├── src/
 │       │   ├── lib.rs                     # #![forbid(unsafe_code)]; module root
@@ -36,6 +36,10 @@ The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md)
 │       │   └── verify.rs                  # compact JWS/JWT verification and claims
 │       ├── tests/thumbprint.rs            # RFC 8037 Appendix A thumbprint vectors
 │       └── tests/vectors.rs               # runs testvectors/ against the Rust verifier
+│   └── crates/jose-cli/
+│       ├── Cargo.toml                     # binary jose-cli (verify subcommand today)
+│       ├── src/main.rs
+│       └── tests/verify.rs                # runs jose-cli against testvectors/generated/
 ├── testvectors/
 │   ├── generated/                         # ADR 0003 negative and boundary vectors
 │   ├── rfc/                               # RFC-derived vectors (not populated yet)
@@ -45,7 +49,7 @@ The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md)
 └── AGENTS.md
 ```
 
-These paths are described in older notes and are not in the tree: `zig/`, `go/`, `docs/threat-model.md`, a `jose-cli` binary, and `.github/workflows/`. When another language is added, give it its own `mise.toml` in that directory.
+These paths are described in older notes and are not in the tree: `zig/`, `go/`, `docs/threat-model.md`, and `.github/workflows/`. When another language is added, give it its own `mise.toml` in that directory.
 
 ## Setup
 
@@ -76,7 +80,7 @@ cargo test --workspace
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-All three succeeded on `rustc 1.99.0` (`cargo +stable` from `rust/`). `cargo test --workspace` ran 69 unit tests, 8 integration tests in `tests/thumbprint.rs`, 1 vector-suite test in `tests/vectors.rs` (which loops over every file under `testvectors/`), and 0 doc-tests.
+All three succeeded on `rustc 1.99.0` (`cargo +stable` from `rust/`). `cargo test --workspace` ran 69 unit tests, 8 integration tests in `tests/thumbprint.rs`, 1 vector-suite test in `tests/vectors.rs` (which loops over every file under `testvectors/`), 2 integration tests in `jose-cli/tests/verify.rs`, and 0 doc-tests.
 
 Run one integration test, or that test file:
 
