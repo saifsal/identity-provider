@@ -1,0 +1,17 @@
+{
+  "id": "neg-empty-segment",
+  "source": "generated",
+  "description": "Rejects a compact token with an empty segment.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": ["EdDSA"],
+    "now": 0
+  },
+  "token": "a..a",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

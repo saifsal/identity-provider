@@ -1,0 +1,17 @@
+{
+  "id": "neg-kid-missing",
+  "source": "generated",
+  "description": "Rejects a token with no kid header during key lookup.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": ["EdDSA"],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJFZERTQSJ9.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "key_not_found"
+  }
+}

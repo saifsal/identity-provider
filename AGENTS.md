@@ -4,7 +4,7 @@
 
 identity-provider is an educational OAuth 2.0 / OpenID Connect identity provider. Its purpose is to learn the protocols by implementing the layers underneath them (JOSE, token issuance, verification, and later the OAuth and OIDC flows) and to compare independent implementations of the same security-critical code with a shared test-vector contract. It has had no external review. It is not a production identity provider.
 
-Milestone M0 is in progress. The checked-in implementation is the Rust library crate `jose` at `rust/crates/jose`. That crate signs and verifies compact JWS/JWT payloads, parses JWK and JWKS documents, computes RFC 7638 thumbprints, and enforces the verifier rules in `docs/adr/0003-verifier-check-order.md`. Rust signing of EdDSA and ES256, including compact serialization, is implemented. Still outstanding for M0: a `jose-cli` binary, shared RFC and generated vector files under `testvectors/`, a Zig verifier, and a Go differential harness. Later milestones (OAuth, OIDC, token lifecycle, authentication, control plane, federation) are planned and have no code yet.
+Milestone M0 is in progress. The checked-in implementation is the Rust library crate `jose` at `rust/crates/jose`. That crate signs and verifies compact JWS/JWT payloads, parses JWK and JWKS documents, computes RFC 7638 thumbprints, and enforces the verifier rules in `docs/adr/0003-verifier-check-order.md`. Rust signing of EdDSA and ES256, including compact serialization, is implemented. Seed generated vectors now exist under `testvectors/generated/`. Still outstanding for M0: a `jose-cli` binary, the RFC vector corpus (and broader generated coverage), a Zig verifier, and a Go differential harness. Later milestones (OAuth, OIDC, token lifecycle, authentication, control plane, federation) are planned and have no code yet.
 
 The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md). That document is the M0 scope, the evidence that exists today, and the completion rule: do not treat a behavior as conformant until shared vectors exercise it. Accepted decisions that constrain that work are in [`docs/adr/`](docs/adr/). The milestone list through M8 is in [`README.md`](README.md).
 
@@ -36,13 +36,15 @@ The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md)
 │       │   └── verify.rs                  # compact JWS/JWT verification and claims
 │       └── tests/thumbprint.rs            # RFC 8037 Appendix A thumbprint vectors
 ├── testvectors/
-│   └── schema.json                        # vector schema; no case files yet
+│   ├── generated/                         # seed generated vectors (incomplete set)
+│   ├── rfc/                               # RFC-derived vectors (not populated yet)
+│   └── schema.json                        # vector schema
 ├── LICENSE                                # GNU GPL version 3
 ├── README.md
 └── AGENTS.md
 ```
 
-These paths are described in older notes and are not in the tree: `zig/`, `go/`, `docs/threat-model.md`, `testvectors/rfc/`, `testvectors/generated/`, a `jose-cli` binary, and `.github/workflows/`. When another language is added, give it its own `mise.toml` in that directory.
+These paths are described in older notes and are not in the tree: `zig/`, `go/`, `docs/threat-model.md`, a `jose-cli` binary, and `.github/workflows/`. When another language is added, give it its own `mise.toml` in that directory.
 
 ## Setup
 
@@ -125,7 +127,7 @@ Local tooling that does exist:
 ## Gotchas
 
 - The tree is the source of truth for what runs. Design notes in the ADRs and the milestone table in the README describe Zig, Go, a CLI, and an authorization server that are not implemented.
-- `testvectors/` contains `schema.json` only. There is no `rfc/` or `generated/` directory, so the shared-vector suite cannot be run yet. Unit tests are not a substitute for that suite; `docs/rfc-conformance.md` says so.
+- `testvectors/` now includes seed files under `generated/`, but M0 conformance is still incomplete until RFC vectors are present and all implementations agree on the full suite. Unit tests are not a substitute for that suite; `docs/rfc-conformance.md` says so.
 - `docs/threat-model.md` is not in the repository.
 - Rust older than 1.88 does not compile `b64url.rs`. A default toolchain of 1.83 fails even though `Cargo.lock` resolves.
 - `cargo test` does not start a server. There is nothing to run.
