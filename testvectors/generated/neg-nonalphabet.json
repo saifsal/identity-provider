@@ -1,0 +1,19 @@
+{
+  "id": "neg-nonalphabet",
+  "source": "generated",
+  "description": "Rejects a character outside the base64url alphabet.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "a!.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

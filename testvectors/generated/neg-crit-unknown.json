@@ -1,0 +1,19 @@
+{
+  "id": "neg-crit-unknown",
+  "source": "generated",
+  "description": "Rejects any crit header as unsupported.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiZXhwIl0sImtpZCI6ImsxIn0.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "crit_unsupported"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "neg-extra-segment",
+  "source": "generated",
+  "description": "Rejects a token with four segments.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "a.b.c.d",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

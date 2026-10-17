@@ -1,0 +1,20 @@
+{
+  "id": "neg-typ-missing",
+  "source": "generated",
+  "description": "Rejects a missing typ when policy requires one.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0,
+    "typ": "at+jwt"
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "typ_mismatch"
+  }
+}

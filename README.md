@@ -145,6 +145,12 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 `cargo test --workspace` passed on `rustc 1.99.0`: 69 unit tests, 8 tests in `tests/thumbprint.rs`, and no doc-tests. Clippy with `-D warnings` passed on the same toolchain.
 
+The shared vectors under `testvectors/` run against the Rust verifier as one integration test (it loops over every case; rejections must match on the exact error code):
+
+```bash
+cargo test -p jose --test vectors
+```
+
 A single thumbprint test:
 
 ```bash
@@ -205,7 +211,7 @@ flowchart LR
     verifiers --> harness{{"Go harness: do all verdicts match each other and the expectation?"}}
 ```
 
-The Rust signer and the Rust verifier in that diagram exist as library functions. Seed generated vectors now exist under `testvectors/generated/`, while the Zig verifier, Go harness, and the full RFC vector corpus are still missing.
+The Rust signer and the Rust verifier in that diagram exist as library functions. Generated vectors under `testvectors/generated/` now run against the Rust verifier (`cargo test -p jose --test vectors`), while the Zig verifier, Go harness, and the full RFC vector corpus are still missing.
 
 No GitHub Actions workflow is checked in. ADR 0002 describes a future CI check that regenerates vectors and fails on a dirty tree. That check waits on the CLI and the vector files.
 

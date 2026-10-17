@@ -1,0 +1,19 @@
+{
+  "id": "neg-b64-noncanonical-header",
+  "source": "generated",
+  "description": "Rejects a non-canonical base64url header segment.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "Zh.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "neg-crit-empty",
+  "source": "generated",
+  "description": "Rejects an empty crit array as malformed.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImNyaXQiOltdLCJraWQiOiJrMSJ9.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

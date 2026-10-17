@@ -1,0 +1,19 @@
+{
+  "id": "neg-padding",
+  "source": "generated",
+  "description": "Rejects '=' padding in a segment.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0=.e30.AA",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}
