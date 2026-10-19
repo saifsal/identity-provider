@@ -2,7 +2,14 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+const VALID_JWKS: &[u8] = br#"{"keys":[{"kty":"OKP","crv":"Ed25519","x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo","kid":"k1"}]}"#;
+const VALID_POLICY: &[u8] = br#"{"algs":["EdDSA"],"now":100}"#;
+const VALID_TOKEN: &str = "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjEwMX0.v6crgAoEo86g2X89VfNnnXvQ5xUvGG5uiGLceBYoAo8deIGLzAKtF7kG21o7EMrbSxgkVfy_LjIr-Wyr3-ScDQ";
+
+static NEXT_TEMP_DIR: AtomicU64 = AtomicU64::new(0);
 
 fn bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_jose-cli"))
@@ -10,6 +17,13 @@ fn bin() -> PathBuf {
 
 fn testvectors_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../testvectors")
+}
+
+fn temp_dir(label: &str) -> PathBuf {
+    let id = NEXT_TEMP_DIR.fetch_add(1, Ordering::Relaxed);
+    let path = std::env::temp_dir().join(format!("jose-cli-{label}-{}-{id}", std::process::id()));
+    fs::create_dir(&path).expect("create temp dir");
+    path
 }
 
 fn write_json(value: &jose::json::Value, out: &mut String) {
@@ -75,17 +89,22 @@ fn verify_matches_shared_vectors() {
         let case = path.display().to_string();
         let text = fs::read_to_string(&path).expect("read vector");
         let root = jose::json::parse(text.as_bytes()).expect("vector JSON");
-        let id = root.get("id").and_then(jose::json::Value::as_str).expect("id");
+        let id = root
+            .get("id")
+            .and_then(jose::json::Value::as_str)
+            .expect("id");
         assert_eq!(id, path.file_stem().unwrap().to_str().unwrap());
 
         let mut jwks_text = String::new();
         write_json(root.get("jwks").expect("jwks"), &mut jwks_text);
         let mut policy_text = String::new();
         write_json(root.get("policy").expect("policy"), &mut policy_text);
-        let token = root.get("token").and_then(jose::json::Value::as_str).expect("token");
+        let token = root
+            .get("token")
+            .and_then(jose::json::Value::as_str)
+            .expect("token");
 
-        let tmp = std::env::temp_dir().join(format!("jose-cli-{id}"));
-        fs::create_dir_all(&tmp).expect("temp dir");
+        let tmp = temp_dir(id);
         let jwks_file = tmp.join("jwks.json");
         let policy_file = tmp.join("policy.json");
         fs::write(&jwks_file, jwks_text).expect("write jwks");
@@ -147,8 +166,7 @@ fn verify_matches_shared_vectors() {
 
 #[test]
 fn jwks_configuration_error_exits_two() {
-    let tmp = std::env::temp_dir().join("jose-cli-config-err");
-    fs::create_dir_all(&tmp).expect("temp dir");
+    let tmp = temp_dir("jwks-config-error");
     let policy_file = tmp.join("policy.json");
     fs::write(&policy_file, br#"{"algs":["EdDSA"],"now":0}"#).expect("write policy");
     let jwks_file = tmp.join("jwks.json");
@@ -173,4 +191,114 @@ fn jwks_configuration_error_exits_two() {
     assert_eq!(output.status.code(), Some(2));
     assert!(output.stdout.is_empty());
     let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn verify_accepts_default_stdin_and_token_file_inputs() {
+    let tmp = temp_dir("token-inputs");
+    let jwks_file = tmp.join("jwks.json");
+    let policy_file = tmp.join("policy.json");
+    let token_file = tmp.join("token.jwt");
+    fs::write(&jwks_file, VALID_JWKS).expect("write JWKS");
+    fs::write(&policy_file, VALID_POLICY).expect("write policy");
+    fs::write(&token_file, VALID_TOKEN).expect("write token");
+
+    let base_args = [
+        "verify",
+        "--jwks",
+        jwks_file.to_str().unwrap(),
+        "--policy",
+        policy_file.to_str().unwrap(),
+    ];
+    let mut stdin_command = Command::new(bin());
+    let mut stdin_child = stdin_command
+        .args(base_args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("run with stdin");
+    {
+        use std::io::Write;
+        stdin_child
+            .stdin
+            .take()
+            .expect("stdin")
+            .write_all(VALID_TOKEN.as_bytes())
+            .expect("write token");
+    }
+    let stdin_output = stdin_child
+        .wait_with_output()
+        .expect("wait for stdin command");
+    assert_eq!(stdin_output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(stdin_output.stdout).unwrap().trim(),
+        r#"{"ok":true,"kid":"k1","alg":"EdDSA"}"#
+    );
+
+    let file_output = Command::new(bin())
+        .args(base_args)
+        .args(["--token", token_file.to_str().unwrap()])
+        .output()
+        .expect("run with token file");
+    assert_eq!(file_output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(file_output.stdout).unwrap().trim(),
+        r#"{"ok":true,"kid":"k1","alg":"EdDSA"}"#
+    );
+
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
+fn invalid_policy_configuration_exits_two_without_a_verdict() {
+    let cases: &[(&str, &[u8], &str)] = &[
+        (
+            "malformed-json",
+            br#"{"algs":["EdDSA"],"now":100"#,
+            "policy is not valid JSON",
+        ),
+        (
+            "unknown-algorithm",
+            br#"{"algs":["none"],"now":100}"#,
+            "unknown alg",
+        ),
+        (
+            "negative-leeway",
+            br#"{"algs":["EdDSA"],"now":100,"leeway":-1}"#,
+            "leeway must be non-negative",
+        ),
+        (
+            "fractional-size-limit",
+            br#"{"algs":["EdDSA"],"now":100,"max_token_bytes":1.5}"#,
+            "max_token_bytes must be an integer",
+        ),
+    ];
+
+    for (label, policy, expected_error) in cases {
+        let tmp = temp_dir(label);
+        let jwks_file = tmp.join("jwks.json");
+        let policy_file = tmp.join("policy.json");
+        fs::write(&jwks_file, VALID_JWKS).expect("write JWKS");
+        fs::write(&policy_file, policy).expect("write policy");
+
+        let output = Command::new(bin())
+            .args([
+                "verify",
+                "--jwks",
+                jwks_file.to_str().unwrap(),
+                "--policy",
+                policy_file.to_str().unwrap(),
+            ])
+            .output()
+            .expect("run");
+        assert_eq!(output.status.code(), Some(2), "{label}");
+        assert!(output.stdout.is_empty(), "{label}");
+        assert!(
+            String::from_utf8(output.stderr)
+                .expect("UTF-8 stderr")
+                .contains(expected_error),
+            "{label}"
+        );
+        let _ = fs::remove_dir_all(&tmp);
+    }
 }
