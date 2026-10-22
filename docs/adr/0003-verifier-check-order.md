@@ -78,7 +78,9 @@ fails.
 - `iss` and `aud` are compared by exact string equality, with no normalization,
   trailing-slash handling or case folding.
 - When the policy omits `iss` or `aud`, that check is skipped. The RFC 7515
-  Appendix A.1 token carries no `aud`, so its vector relies on this.
+  Appendix A.1 token carries no `aud`, and its vector omits `aud`. That token
+  also has no `kid`, so key lookup rejects it with `key_not_found` and the
+  audience check is not reached.
 
 ### Base64url decoding is canonical
 

@@ -1,0 +1,19 @@
+{
+  "id": "rfc7515-a4-es512",
+  "source": "RFC 7515 Appendix A.4",
+  "description": "RFC 7515 Appendix A.4 compact ES512 JWS is rejected because ES512 is not an allowed algorithm.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJFUzUxMiJ9.UGF5bG9hZA.AdwMgeerwtHoh-l192l60hp9wAHZFVJbLfD_UxMi70cwnZOYaRI1bKPWROc-mZZqwqT2SI-KGDKB34XO0aw_7XdtAG8GaSwFKdCAPZgoXD2YBJZCPEX3xKpRwcdOO8KpEHwJjyqOgzDO7iKvU8vcnwNrmxYbSW9ERBXukOXolLzeO_Jn",
+  "expect": {
+    "ok": false,
+    "error": "alg_not_allowed"
+  }
+}

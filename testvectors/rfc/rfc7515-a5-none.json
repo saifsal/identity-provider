@@ -1,0 +1,19 @@
+{
+  "id": "rfc7515-a5-none",
+  "source": "RFC 7515 Appendix A.5",
+  "description": "RFC 7515 Appendix A.5 unsecured compact JWS is rejected because the signature segment is empty.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 1300819379
+  },
+  "token": "eyJhbGciOiJub25lIn0.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "rfc7515-e-crit",
+  "source": "RFC 7515 Appendix E",
+  "description": "RFC 7515 Appendix E crit example is rejected because the signature segment is empty, before crit is read.",
+  "jwks": {
+    "keys": []
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 1300819379
+  },
+  "token": "eyJhbGciOiJub25lIiwNCiAiY3JpdCI6WyJodHRwOi8vZXhhbXBsZS5jb20vVU5ERUZJTkVEIl0sDQogImh0dHA6Ly9leGFtcGxlLmNvbS9VTkRFRklORUQiOnRydWUNCn0.RkFJTA.",
+  "expect": {
+    "ok": false,
+    "error": "malformed"
+  }
+}

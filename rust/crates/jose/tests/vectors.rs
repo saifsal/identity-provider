@@ -1,13 +1,20 @@
 //! Runs the shared test vectors under `testvectors/` against the Rust
 //! verifier (ADR 0002). Every implementation must produce the verdict in
 //! `expect`; a rejection must match on the exact error code (ADR 0003).
+//!
+//! `rfc_signatures_match_when_kid_is_absent` additionally checks the
+//! published signature bytes of the RFC examples whose headers have no
+//! `kid`. Those shared verdicts are `key_not_found` and never reach the
+//! signature check.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use jose::alg::Alg;
+use jose::b64url;
 use jose::json::{self, Value};
 use jose::jwks::Jwks;
+use jose::signature;
 use jose::verify::{self, Policy};
 
 fn testvectors_dir() -> PathBuf {
@@ -192,5 +199,52 @@ fn shared_vectors_match_the_rust_verifier() {
     );
     for file in &files {
         run_vector(file);
+    }
+}
+
+/// RFC 7515 Appendix A.1, RFC 7515 Appendix A.3, and RFC 8037 Appendix A.4
+/// publish valid signatures on headers that have no `kid`. ADR 0003 returns
+/// `key_not_found` before the signature is checked, so the shared verdict does
+/// not lock those bytes. This test does.
+#[test]
+fn rfc_signatures_match_when_kid_is_absent() {
+    let cases = [
+        ("rfc7515-a1-hs256", Alg::HS256),
+        ("rfc7515-a3-es256", Alg::ES256),
+        ("rfc8037-a4-eddsa", Alg::EdDSA),
+    ];
+    for (id, alg) in cases {
+        let path = testvectors_dir().join("rfc").join(format!("{id}.json"));
+        let text = fs::read(&path).unwrap_or_else(|e| panic!("{id}: cannot read: {e}"));
+        let root = json::parse(&text).unwrap_or_else(|e| panic!("{id}: invalid JSON: {e}"));
+        assert_eq!(
+            root.get("expect")
+                .and_then(|expect| expect.get("error"))
+                .and_then(Value::as_str),
+            Some("key_not_found"),
+            "{id}: shared verdict"
+        );
+
+        let mut jwks_text = String::new();
+        write_json(
+            root.get("jwks").unwrap_or_else(|| panic!("{id}: missing jwks")),
+            &mut jwks_text,
+        );
+        let jwks = Jwks::parse(jwks_text.as_bytes())
+            .unwrap_or_else(|e| panic!("{id}: JWKS is a configuration error: {e}"));
+        let material = jwks
+            .keys()
+            .iter()
+            .find_map(|key| key.material())
+            .unwrap_or_else(|| panic!("{id}: no usable key"));
+
+        let token = string(&root, "token", id);
+        let (signing_input, signature_segment) = token
+            .rsplit_once('.')
+            .unwrap_or_else(|| panic!("{id}: token has no signature separator"));
+        let signature_bytes = b64url::decode(signature_segment)
+            .unwrap_or_else(|_| panic!("{id}: signature segment is not canonical base64url"));
+        signature::verify(alg, material, signing_input.as_bytes(), &signature_bytes)
+            .unwrap_or_else(|_| panic!("{id}: published signature did not verify"));
     }
 }

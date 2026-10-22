@@ -62,14 +62,19 @@ fn write_json(value: &jose::json::Value, out: &mut String) {
 
 #[test]
 fn verify_matches_shared_vectors() {
-    let root = testvectors_dir().join("generated");
-    let mut paths: Vec<PathBuf> = fs::read_dir(&root)
-        .expect("generated vectors directory")
-        .map(|e| e.expect("entry").path())
-        .filter(|p| p.extension().is_some_and(|e| e == "json"))
-        .collect();
-    paths.sort();
-    assert!(!paths.is_empty(), "expected at least one generated vector");
+    let root = testvectors_dir();
+    let mut paths = Vec::new();
+    for sub in ["generated", "rfc"] {
+        let dir = root.join(sub);
+        let mut found: Vec<PathBuf> = fs::read_dir(&dir)
+            .unwrap_or_else(|e| panic!("vectors directory {}: {e}", dir.display()))
+            .map(|e| e.expect("entry").path())
+            .filter(|p| p.extension().is_some_and(|ext| ext == "json"))
+            .collect();
+        found.sort();
+        assert!(!found.is_empty(), "expected vectors in {}", dir.display());
+        paths.append(&mut found);
+    }
 
     for path in paths {
         let case = path.display().to_string();

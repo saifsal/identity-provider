@@ -1,0 +1,25 @@
+{
+  "id": "rfc8037-a4-eddsa",
+  "source": "RFC 8037 Appendix A.4",
+  "description": "RFC 8037 Appendix A.4 compact EdDSA JWS has no kid, so key lookup fails before the signature is checked.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "EdDSA"
+    ],
+    "now": 0
+  },
+  "token": "eyJhbGciOiJFZERTQSJ9.RXhhbXBsZSBvZiBFZDI1NTE5IHNpZ25pbmc.hgyY0il_MGCjP0JzlnLWG1PPOt7-09PGcvMg3AIbQR6dWbhijcNR4ki4iylGjg5BhVsPt9g7sVvpAr_MuM0KAg",
+  "expect": {
+    "ok": false,
+    "error": "key_not_found"
+  }
+}

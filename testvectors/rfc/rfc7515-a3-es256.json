@@ -1,0 +1,26 @@
+{
+  "id": "rfc7515-a3-es256",
+  "source": "RFC 7515 Appendix A.3",
+  "description": "RFC 7515 Appendix A.3 compact ES256 JWT has no kid, so key lookup fails before the signature is checked.",
+  "jwks": {
+    "keys": [
+      {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+        "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0"
+      }
+    ]
+  },
+  "policy": {
+    "algs": [
+      "ES256"
+    ],
+    "now": 1300819379
+  },
+  "token": "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.DtEhU3ljbEg8L38VWAfUAqOyKAM6-Xx-F4GawxaepmXFCgfTjDxw5djxLa8ISlSApmWQxfKTUJqPP3-Kg6NU1Q",
+  "expect": {
+    "ok": false,
+    "error": "key_not_found"
+  }
+}

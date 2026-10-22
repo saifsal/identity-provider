@@ -135,7 +135,7 @@ Nothing is read from the environment, a config file, or Cargo features. The call
 | `typ` | When set, the header `typ` must match, case-insensitively, after removing one leading `application/`. `at+jwt` and `application/at+jwt` match. |
 | `max_token_bytes` | Tokens longer than this are `too_large`. The Rust struct has no default; the vector schema's default is 8192. |
 
-The same field names appear in [`testvectors/schema.json`](testvectors/schema.json) and are used by the checked-in vectors under `testvectors/generated/` (`iss`, `aud`, `algs`, `now`, `leeway`, `typ`, `max_token_bytes`). RFC-derived vectors are still to be added under `testvectors/rfc/`.
+The same field names appear in [`testvectors/schema.json`](testvectors/schema.json) and are used by the checked-in vectors under `testvectors/generated/` and `testvectors/rfc/` (`iss`, `aud`, `algs`, `now`, `leeway`, `typ`, `max_token_bytes`). The RFC files are compact examples copied from RFC 7515 and RFC 8037. Several of those headers have no `kid`, so ADR 0003 rejects them with `key_not_found` before the signature is checked.
 
 JWKS JSON is an object with a `keys` array. Accepted public keys are `{"kty":"OKP","crv":"Ed25519","x":"..."}` and `{"kty":"EC","crv":"P-256","x":"...","y":"..."}`. `{"kty":"oct","k":"..."}` is for `HS256` verification only. `kid` is how a token selects a key. A duplicate `kid` is a configuration error from `Jwks::parse`. Header parameters that would fetch or embed a key (`jku`, `jwk`, `x5u`, `x5c`, `x5t`) are ignored.
 
@@ -150,7 +150,7 @@ cargo test --workspace
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-`cargo test --workspace` passed on `rustc 1.99.0`: 69 unit tests in `jose`, 8 tests in `tests/thumbprint.rs`, 1 vector-suite test in `tests/vectors.rs`, 2 integration tests in `jose-cli`, and no doc-tests. Clippy with `-D warnings` passed on the same toolchain.
+`cargo test --workspace` passed on `rustc 1.99.0`: 69 unit tests in `jose`, 8 tests in `tests/thumbprint.rs`, 2 tests in `tests/vectors.rs` (the shared-vector run, plus a check of the RFC signatures that stop at `key_not_found`), 2 integration tests in `jose-cli`, and no doc-tests. Clippy with `-D warnings` passed on the same toolchain.
 
 The shared vectors under `testvectors/` run against the Rust verifier as one integration test (it loops over every case; rejections must match on the exact error code):
 
@@ -179,7 +179,7 @@ Agent instructions for working in this repository live in [`AGENTS.md`](AGENTS.m
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M0** | JOSE: JWS signing and verification, JWK/JWKS, thumbprints, shared test vectors | In progress. The Rust `jose` library, ADR 0003 generated vectors, and `jose-cli verify` are in the tree. The RFC vector corpus, remaining CLI subcommands, Zig verifier, and Go harness are not. |
+| **M0** | JOSE: JWS signing and verification, JWK/JWKS, thumbprints, shared test vectors | In progress. The Rust `jose` library, ADR 0003 generated vectors, the RFC compact examples under `testvectors/rfc/`, and `jose-cli verify` are in the tree. The remaining CLI subcommands, Zig verifier, and Go harness are not. |
 | M1 | OAuth 2.0 authorization code flow with PKCE | Planned |
 | M2 | OpenID Connect: ID tokens, discovery, userinfo | Planned |
 | M3 | Token lifecycle: refresh rotation, introspection, revocation, key rotation | Planned |
@@ -218,7 +218,7 @@ flowchart LR
     verifiers --> harness{{"Go harness: do all verdicts match each other and the expectation?"}}
 ```
 
-The Rust signer and the Rust verifier in that diagram exist as library functions. Generated vectors under `testvectors/generated/` now run against the Rust verifier (`cargo test -p jose --test vectors`), while the Zig verifier, Go harness, and the full RFC vector corpus are still missing.
+The Rust signer and the Rust verifier in that diagram exist as library functions. Generated vectors under `testvectors/generated/` and the RFC compact examples under `testvectors/rfc/` run against the Rust verifier (`cargo test -p jose --test vectors`). The Zig verifier and Go harness are still missing.
 
 No GitHub Actions workflow is checked in. ADR 0002 describes a future CI check that regenerates vectors and fails on a dirty tree. That check waits on the CLI and the vector files.
 

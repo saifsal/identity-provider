@@ -24,8 +24,10 @@ Constraints specific to this project:
    the default policy.
 2. **`ES256` is supported** for interoperability with clients and key stores that
    do not offer Ed25519.
-3. **`HS256` is verify-only** and exists solely so the RFC 7515 Appendix A.1 vector
-   can pass. It is never in a default policy and the signer cannot produce it.
+3. **`HS256` is verify-only** and exists so the HMAC in RFC 7515 Appendix A.1
+   can be checked. It is never in a default policy and the signer cannot produce
+   it. The compact token in that appendix has no `kid`, so ADR 0003 rejects it
+   with `key_not_found` before the HMAC is checked.
 4. **`RS256` is a Rust-only stretch goal** and is documented as skipped in Zig.
 5. **`none` is never accepted**, under any policy. It is not a member of the
    algorithm enum.
@@ -34,7 +36,8 @@ Constraints specific to this project:
 
 - Ed25519 signatures are deterministic, so the Rust signer can be checked against
   RFC 8037 Appendix A byte for byte. ES256 signatures are randomized, so the RFC
-  7515 A.3 vector is verified only, and ES256 signing is tested by round trip.
+  7515 Appendix A.3 signature is verified only, and ES256 signing is tested by
+  round trip.
 - ES256 signatures in JWS are the raw 64-byte `R || S` concatenation, not DER.
   Verifiers must reject DER-encoded signatures and wrong-length signatures
   (`bad_signature`).
