@@ -9,14 +9,14 @@ An educational OAuth 2.0 / OpenID Connect identity provider. The work checked in
 
 Most identity code calls a JOSE library and then implements OAuth on top. This repository builds the JOSE layer itself: strict base64url, strict JSON, JWK and JWKS handling, thumbprints, signatures, and the checks a verifier runs before it trusts a token. The longer-term aim is an authorization server, with the same verifier written more than once. A shared set of test vectors, specified in [`testvectors/schema.json`](testvectors/schema.json) and [`docs/adr/0002-vectors-are-the-contract.md`](docs/adr/0002-vectors-are-the-contract.md), is how disagreements between those implementations become failing tests.
 
-The library is the crate `jose` in [`rust/crates/jose`](rust/crates/jose). It is not published to crates.io (`publish = false`). The workspace also builds `jose-cli` with a `verify` subcommand. There is no server or other language implementation in the tree yet.
+The library is the crate `jose` in [`rust/crates/jose`](rust/crates/jose). It is not published to crates.io (`publish = false`). The workspace also builds `jose-cli` with `verify` and `keygen` subcommands. There is no server or other language implementation in the tree yet.
 
 ## Features
 
 What `jose` does now:
 
 - Compact JWS signing and verification for a JSON object payload. `jose::signing::sign_compact` keeps the protected header bytes as given. `jose::verify::verify` returns the `kid`, algorithm, and parsed claims.
-- `EdDSA` (Ed25519) and `ES256` (P-256, SHA-256) signing from a PKCS#8 private key. ES256 signatures are the 64-byte JOSE concatenation of `R` and `S`, not ASN.1 DER. Ed25519 signatures are deterministic.
+- `EdDSA` (Ed25519) and `ES256` (P-256, SHA-256) signing from a PKCS#8 private key. `jose::signing::generate_signing_key` creates that key. ES256 signatures are the 64-byte JOSE concatenation of `R` and `S`, not ASN.1 DER. Ed25519 signatures are deterministic.
 - Verification of `EdDSA`, `ES256`, and `HS256`. `HS256` exists so the RFC 7515 Appendix A.1 vector can be checked. The signer refuses it. `HS256` keys must be at least 32 bytes. `none` cannot be named, and `RS256` is not implemented.
 - JWK public keys for `OKP` / `Ed25519` and `EC` / `P-256`, plus `oct` secrets for `HS256` verification. RFC 7638 SHA-256 thumbprints for the two public key types, covered by [`rust/crates/jose/tests/thumbprint.rs`](rust/crates/jose/tests/thumbprint.rs) (RFC 8037 Appendix A).
 - JWKS parsing and lookup by exact `kid`, with the key-selection rules in [`docs/adr/0003-verifier-check-order.md`](docs/adr/0003-verifier-check-order.md).
@@ -112,7 +112,7 @@ fn main() {
 
 `sign` signs already-encoded ASCII `header.payload` bytes and returns the raw signature. `sign_compact` builds the three-segment token. Both reject `HS256`.
 
-Build `jose-cli` with `cargo build --workspace`. Today it implements `verify` only; `keygen`, `jwks`, `sign`, and `gen-vectors` are still planned.
+Build `jose-cli` with `cargo build --workspace`. Today it implements `verify` and `keygen`. `jwks`, `sign`, and `gen-vectors` are still planned.
 
 ```bash
 cargo build -p jose-cli
@@ -120,6 +120,12 @@ cargo build -p jose-cli
 ```
 
 `verify` prints a JSON verdict on stdout (`{"ok":true,"kid":"...","alg":"..."}` or `{"ok":false,"error":"..."}`). Exit code `0` means the token verified, `1` means it was rejected, and `2` means the JWKS or policy could not be loaded (configuration error, no verdict). Policy JSON uses the same field names as [`testvectors/schema.json`](testvectors/schema.json) (`algs`, `now`, and optional `iss`, `aud`, `leeway`, `typ`, `max_token_bytes`).
+
+`keygen` prints one JSON object on stdout and exits `0`. `2` is a usage error, with the message on stderr and no JSON. `--alg` is `EdDSA` or `ES256`. `HS256` is rejected. `pkcs8` is the unpadded base64url encoding of a PKCS#8 v2 private key, and `jwk` is the public key. Without `--kid`, `kid` is the RFC 7638 thumbprint of that public key.
+
+```bash
+./target/debug/jose-cli keygen --alg EdDSA
+```
 
 ## Configuration
 
@@ -150,7 +156,7 @@ cargo test --workspace
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-`cargo test --workspace` passed on `rustc 1.99.0`: 69 unit tests in `jose`, 8 tests in `tests/thumbprint.rs`, 2 tests in `tests/vectors.rs` (the shared-vector run, plus a check of the RFC signatures that stop at `key_not_found`), 2 integration tests in `jose-cli`, and no doc-tests. Clippy with `-D warnings` passed on the same toolchain.
+`cargo test --workspace` passed on `rustc 1.99.0`: 70 unit tests in `jose`, 8 tests in `tests/thumbprint.rs`, 2 tests in `tests/vectors.rs` (the shared-vector run, plus a check of the RFC signatures that stop at `key_not_found`), 6 integration tests in `jose-cli`, and no doc-tests. Clippy with `-D warnings` passed on the same toolchain.
 
 The shared vectors under `testvectors/` run against the Rust verifier as one integration test (it loops over every case; rejections must match on the exact error code):
 
@@ -179,7 +185,7 @@ Agent instructions for working in this repository live in [`AGENTS.md`](AGENTS.m
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M0** | JOSE: JWS signing and verification, JWK/JWKS, thumbprints, shared test vectors | In progress. The Rust `jose` library, ADR 0003 generated vectors, the RFC compact examples under `testvectors/rfc/`, and `jose-cli verify` are in the tree. The remaining CLI subcommands, Zig verifier, and Go harness are not. |
+| **M0** | JOSE: JWS signing and verification, JWK/JWKS, thumbprints, shared test vectors | In progress. The Rust `jose` library, ADR 0003 generated vectors, the RFC compact examples under `testvectors/rfc/`, and `jose-cli verify` and `keygen` are in the tree. `jwks`, `sign`, `gen-vectors`, the Zig verifier, and the Go harness are not. |
 | M1 | OAuth 2.0 authorization code flow with PKCE | Planned |
 | M2 | OpenID Connect: ID tokens, discovery, userinfo | Planned |
 | M3 | Token lifecycle: refresh rotation, introspection, revocation, key rotation | Planned |

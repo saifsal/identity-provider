@@ -2,16 +2,18 @@
 
 use std::fmt;
 
-use ring::signature::{self, EcdsaKeyPair, Ed25519KeyPair};
+use ring::signature::{self, EcdsaKeyPair, Ed25519KeyPair, KeyPair};
 
 use crate::alg::Alg;
 use crate::b64url;
 use crate::json::{self, Value};
+use crate::jwk::PublicKey;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SigningError {
     UnsupportedAlgorithm,
     InvalidKey,
+    KeyGenerationFailed,
     SigningFailed,
     InvalidProtectedHeader,
     AlgorithmMismatch,
@@ -26,6 +28,7 @@ impl fmt::Display for SigningError {
                 f.write_str("the algorithm is not available for signing")
             }
             SigningError::InvalidKey => f.write_str("invalid PKCS#8 signing key"),
+            SigningError::KeyGenerationFailed => f.write_str("key generation failed"),
             SigningError::SigningFailed => f.write_str("signature generation failed"),
             SigningError::InvalidProtectedHeader => {
                 f.write_str("protected header must be a valid JSON object with a string kid")
@@ -42,6 +45,55 @@ impl fmt::Display for SigningError {
 }
 
 impl std::error::Error for SigningError {}
+
+/// A freshly generated signing key.
+///
+/// `pkcs8` is secret key material (PKCS#8 v2). `public` is the matching
+/// verification key.
+pub struct SigningKey {
+    pub pkcs8: Vec<u8>,
+    pub public: PublicKey,
+}
+
+/// Generates an Ed25519 or P-256 signing key.
+///
+/// Ed25519 private keys are PKCS#8 v2 documents that include the public key.
+/// P-256 keys use the same PKCS#8 shape with the P-256 curve. `HS256` is
+/// verify-only and returns [`SigningError::UnsupportedAlgorithm`].
+pub fn generate_signing_key(alg: Alg) -> Result<SigningKey, SigningError> {
+    let rng = ring::rand::SystemRandom::new();
+    match alg {
+        Alg::EdDSA => {
+            let doc = Ed25519KeyPair::generate_pkcs8(&rng)
+                .map_err(|_| SigningError::KeyGenerationFailed)?;
+            let pair = Ed25519KeyPair::from_pkcs8(doc.as_ref())
+                .map_err(|_| SigningError::InvalidKey)?;
+            let public = PublicKey::ed25519_from_bytes(pair.public_key().as_ref())
+                .map_err(|_| SigningError::InvalidKey)?;
+            Ok(SigningKey {
+                pkcs8: doc.as_ref().to_vec(),
+                public,
+            })
+        }
+        Alg::ES256 => {
+            let doc = EcdsaKeyPair::generate_pkcs8(&signature::ECDSA_P256_SHA256_FIXED_SIGNING, &rng)
+                .map_err(|_| SigningError::KeyGenerationFailed)?;
+            let pair = EcdsaKeyPair::from_pkcs8(
+                &signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+                doc.as_ref(),
+                &rng,
+            )
+            .map_err(|_| SigningError::InvalidKey)?;
+            let public = PublicKey::p256_from_uncompressed(pair.public_key().as_ref())
+                .map_err(|_| SigningError::InvalidKey)?;
+            Ok(SigningKey {
+                pkcs8: doc.as_ref().to_vec(),
+                public,
+            })
+        }
+        Alg::HS256 => Err(SigningError::UnsupportedAlgorithm),
+    }
+}
 
 /// Signs the JWS signing input with a PKCS#8 private key.
 ///
@@ -123,6 +175,39 @@ mod tests {
     use ring::signature::KeyPair;
 
     const INPUT: &[u8] = b"eyJhbGciOiJFZERTQSJ9.e30";
+
+    #[test]
+    fn generate_signing_key_matches_the_pkcs8_public_key() {
+        let ed = generate_signing_key(Alg::EdDSA).expect("generate Ed25519 key");
+        let pair = Ed25519KeyPair::from_pkcs8(&ed.pkcs8).expect("parse generated key");
+        assert_eq!(
+            PublicKey::ed25519_from_bytes(pair.public_key().as_ref()).unwrap(),
+            ed.public
+        );
+        let header = format!(
+            r#"{{"alg":"EdDSA","kid":"{}"}}"#,
+            ed.public.thumbprint()
+        );
+        sign_compact(Alg::EdDSA, &ed.pkcs8, header.as_bytes(), br#"{"exp":101}"#)
+            .expect("sign with generated key");
+
+        let rng = SystemRandom::new();
+        let ec = generate_signing_key(Alg::ES256).expect("generate P-256 key");
+        let pair = EcdsaKeyPair::from_pkcs8(
+            &signature::ECDSA_P256_SHA256_FIXED_SIGNING,
+            &ec.pkcs8,
+            &rng,
+        )
+        .expect("parse generated P-256 key");
+        assert_eq!(
+            PublicKey::p256_from_uncompressed(pair.public_key().as_ref()).unwrap(),
+            ec.public
+        );
+        assert!(matches!(
+            generate_signing_key(Alg::HS256),
+            Err(SigningError::UnsupportedAlgorithm)
+        ));
+    }
 
     #[test]
     fn signs_ed25519_deterministically_and_verifies() {

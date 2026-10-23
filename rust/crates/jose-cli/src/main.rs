@@ -1,8 +1,8 @@
 //! Command-line front end for the `jose` library.
 //!
-//! Exit codes (ADR 0003, JWKS configuration errors):
-//! - `0` — token verified
-//! - `1` — token rejected (verdict on stdout)
+//! Exit codes:
+//! - `0` — success (`verify` accepted the token, or `keygen` wrote a key)
+//! - `1` — `verify` rejected the token (verdict on stdout)
 //! - `2` — usage or configuration error (message on stderr, no verdict)
 
 #![forbid(unsafe_code)]
@@ -14,8 +14,11 @@ use std::path::PathBuf;
 use std::process;
 
 use jose::alg::Alg;
+use jose::b64url;
 use jose::json::{self, Value};
+use jose::jwk::PublicKey;
 use jose::jwks::Jwks;
+use jose::signing::{self, SigningError};
 use jose::verify::{self, Policy};
 
 fn main() {
@@ -26,6 +29,7 @@ fn main() {
     }
     match args[1].as_str() {
         "verify" => run_verify(&args[2..]),
+        "keygen" => run_keygen(&args[2..]),
         "help" | "--help" | "-h" => {
             usage(&args[0]);
             process::exit(0);
@@ -42,11 +46,16 @@ fn usage(bin: &str) {
     eprintln!(
         "usage:\n\
   {bin} verify --jwks PATH --policy PATH [--token PATH|-]\n\
+  {bin} keygen --alg EdDSA|ES256 [--kid KID]\n\
   {bin} help\n\
 \n\
 verify reads a compact JWS/JWT and prints a JSON verdict on stdout.\n\
 If --token is omitted or '-', the token bytes are read from stdin.\n\
-Configuration errors (bad JWKS or policy JSON) exit 2 with no verdict."
+Configuration errors (bad JWKS or policy JSON) exit 2 with no verdict.\n\
+\n\
+keygen prints a JSON object on stdout. pkcs8 is the unpadded base64url\n\
+encoding of a PKCS#8 v2 private key. jwk is the public key. When --kid is\n\
+omitted, kid is the RFC 7638 thumbprint. HS256 is verify-only."
     );
 }
 
@@ -60,15 +69,15 @@ fn run_verify(args: &[String]) {
         match args[i].as_str() {
             "--jwks" => {
                 i += 1;
-                jwks_path = Some(expect_path(args, i, "--jwks"));
+                jwks_path = Some(expect_path("verify", args, i, "--jwks"));
             }
             "--policy" => {
                 i += 1;
-                policy_path = Some(expect_path(args, i, "--policy"));
+                policy_path = Some(expect_path("verify", args, i, "--policy"));
             }
             "--token" => {
                 i += 1;
-                let raw = expect_value(args, i, "--token");
+                let raw = expect_value("verify", args, i, "--token");
                 token_path = Some(if raw == "-" {
                     None
                 } else {
@@ -138,21 +147,97 @@ fn run_verify(args: &[String]) {
     }
 }
 
-fn expect_path(args: &[String], i: usize, flag: &str) -> PathBuf {
+fn run_keygen(args: &[String]) {
+    let mut alg_name: Option<String> = None;
+    let mut kid: Option<String> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--alg" => {
+                i += 1;
+                alg_name = Some(expect_value("keygen", args, i, "--alg"));
+            }
+            "--kid" => {
+                i += 1;
+                kid = Some(expect_value("keygen", args, i, "--kid"));
+            }
+            other => {
+                eprintln!("keygen: unexpected argument {:?}", other);
+                process::exit(2);
+            }
+        }
+        i += 1;
+    }
+
+    let alg_name = alg_name.unwrap_or_else(|| {
+        eprintln!("keygen: missing --alg");
+        process::exit(2);
+    });
+    let alg = Alg::from_name(&alg_name).unwrap_or_else(|| {
+        eprintln!("keygen: unknown alg {alg_name:?}");
+        process::exit(2);
+    });
+    if let Some(kid) = &kid {
+        if kid.is_empty() {
+            eprintln!("keygen: --kid must be non-empty");
+            process::exit(2);
+        }
+    }
+
+    let generated = match signing::generate_signing_key(alg) {
+        Ok(key) => key,
+        Err(SigningError::UnsupportedAlgorithm) => {
+            eprintln!("keygen: {alg_name} is verify-only");
+            process::exit(2);
+        }
+        Err(e) => {
+            eprintln!("keygen: {e}");
+            process::exit(2);
+        }
+    };
+
+    let kid = kid.unwrap_or_else(|| generated.public.thumbprint());
+    let pkcs8 = b64url::encode(&generated.pkcs8);
+    println!(
+        "{{\"alg\":{},\"pkcs8\":{},\"jwk\":{}}}",
+        json_string(alg.name()),
+        json_string(&pkcs8),
+        public_jwk(&generated.public, &kid)
+    );
+}
+
+fn public_jwk(public: &PublicKey, kid: &str) -> String {
+    match public {
+        PublicKey::Ed25519 { x } => format!(
+            "{{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":{},\"kid\":{}}}",
+            json_string(&b64url::encode(x)),
+            json_string(kid)
+        ),
+        PublicKey::P256 { x, y } => format!(
+            "{{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":{},\"y\":{},\"kid\":{}}}",
+            json_string(&b64url::encode(x)),
+            json_string(&b64url::encode(y)),
+            json_string(kid)
+        ),
+    }
+}
+
+fn expect_path(cmd: &str, args: &[String], i: usize, flag: &str) -> PathBuf {
     match args.get(i) {
         Some(p) => PathBuf::from(p),
         None => {
-            eprintln!("verify: {flag} requires a path");
+            eprintln!("{cmd}: {flag} requires a path");
             process::exit(2);
         }
     }
 }
 
-fn expect_value(args: &[String], i: usize, flag: &str) -> String {
+fn expect_value(cmd: &str, args: &[String], i: usize, flag: &str) -> String {
     match args.get(i) {
         Some(v) => v.clone(),
         None => {
-            eprintln!("verify: {flag} requires a value");
+            eprintln!("{cmd}: {flag} requires a value");
             process::exit(2);
         }
     }

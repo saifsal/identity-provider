@@ -2,7 +2,7 @@
 name = "jose-cli"
 version = "0.1.0"
 edition = "2021"
-description = "CLI for the identity-provider JOSE layer (verify and, later, vector generation)."
+description = "CLI for the identity-provider JOSE layer (verify, keygen, and, later, vector generation)."
 publish = false
 
 [[bin]]
