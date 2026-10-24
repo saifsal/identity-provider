@@ -1,7 +1,7 @@
 //! Command-line front end for the `jose` library.
 //!
 //! Exit codes:
-//! - `0` — success (`verify` accepted the token, or `keygen` wrote a key)
+//! - `0` — success (`verify` accepted the token, `keygen` wrote a key, or `sign` wrote a token)
 //! - `1` — `verify` rejected the token (verdict on stdout)
 //! - `2` — usage or configuration error (message on stderr, no verdict)
 
@@ -9,7 +9,7 @@
 
 use std::env;
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::process;
 
@@ -30,6 +30,7 @@ fn main() {
     match args[1].as_str() {
         "verify" => run_verify(&args[2..]),
         "keygen" => run_keygen(&args[2..]),
+        "sign" => run_sign(&args[2..]),
         "help" | "--help" | "-h" => {
             usage(&args[0]);
             process::exit(0);
@@ -47,6 +48,7 @@ fn usage(bin: &str) {
         "usage:\n\
   {bin} verify --jwks PATH --policy PATH [--token PATH|-]\n\
   {bin} keygen --alg EdDSA|ES256 [--kid KID]\n\
+  {bin} sign --key PATH --header PATH --payload PATH\n\
   {bin} help\n\
 \n\
 verify reads a compact JWS/JWT and prints a JSON verdict on stdout.\n\
@@ -55,7 +57,11 @@ Configuration errors (bad JWKS or policy JSON) exit 2 with no verdict.\n\
 \n\
 keygen prints a JSON object on stdout. pkcs8 is the unpadded base64url\n\
 encoding of a PKCS#8 v2 private key. jwk is the public key. When --kid is\n\
-omitted, kid is the RFC 7638 thumbprint. HS256 is verify-only."
+omitted, kid is the RFC 7638 thumbprint. HS256 is verify-only.\n\
+\n\
+sign reads a keygen JSON object from --key, protected-header JSON from\n\
+--header, and payload JSON from --payload, then prints a compact JWS on\n\
+stdout with no trailing newline. HS256 is verify-only."
     );
 }
 
@@ -101,7 +107,7 @@ fn run_verify(args: &[String]) {
         process::exit(2);
     });
 
-    let jwks_bytes = read_file(&jwks_path, "JWKS");
+    let jwks_bytes = read_file("verify", &jwks_path, "JWKS");
     let jwks = match Jwks::parse(&jwks_bytes) {
         Ok(j) => j,
         Err(e) => {
@@ -110,7 +116,7 @@ fn run_verify(args: &[String]) {
         }
     };
 
-    let policy_bytes = read_file(&policy_path, "policy");
+    let policy_bytes = read_file("verify", &policy_path, "policy");
     let policy_value = match json::parse(&policy_bytes) {
         Ok(v) => v,
         Err(e) => {
@@ -129,7 +135,7 @@ fn run_verify(args: &[String]) {
     let token_bytes = match token_path {
         None => read_stdin_token(),
         Some(None) => read_stdin_token(),
-        Some(Some(path)) => read_file(&path, "token"),
+        Some(Some(path)) => read_file("verify", &path, "token"),
     };
 
     match verify::verify(&token_bytes, &jwks, &policy) {
@@ -207,6 +213,102 @@ fn run_keygen(args: &[String]) {
     );
 }
 
+fn run_sign(args: &[String]) {
+    let mut key_path: Option<PathBuf> = None;
+    let mut header_path: Option<PathBuf> = None;
+    let mut payload_path: Option<PathBuf> = None;
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--key" => {
+                i += 1;
+                key_path = Some(expect_path("sign", args, i, "--key"));
+            }
+            "--header" => {
+                i += 1;
+                header_path = Some(expect_path("sign", args, i, "--header"));
+            }
+            "--payload" => {
+                i += 1;
+                payload_path = Some(expect_path("sign", args, i, "--payload"));
+            }
+            other => {
+                eprintln!("sign: unexpected argument {:?}", other);
+                process::exit(2);
+            }
+        }
+        i += 1;
+    }
+
+    let key_path = key_path.unwrap_or_else(|| {
+        eprintln!("sign: missing --key");
+        process::exit(2);
+    });
+    let header_path = header_path.unwrap_or_else(|| {
+        eprintln!("sign: missing --header");
+        process::exit(2);
+    });
+    let payload_path = payload_path.unwrap_or_else(|| {
+        eprintln!("sign: missing --payload");
+        process::exit(2);
+    });
+
+    let key_bytes = read_file("sign", &key_path, "key");
+    let key_value = match json::parse(&key_bytes) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("sign: key is not valid JSON: {e}");
+            process::exit(2);
+        }
+    };
+    let (alg, pkcs8) = match signing_key_from_value(&key_value) {
+        Ok(v) => v,
+        Err(msg) => {
+            eprintln!("sign: {msg}");
+            process::exit(2);
+        }
+    };
+    if matches!(alg, Alg::HS256) {
+        eprintln!("sign: HS256 is verify-only");
+        process::exit(2);
+    }
+
+    let header = read_file("sign", &header_path, "header");
+    let payload = read_file("sign", &payload_path, "payload");
+
+    match signing::sign_compact(alg, &pkcs8, &header, &payload) {
+        Ok(token) => {
+            let mut out = io::stdout();
+            out.write_all(token.as_bytes()).unwrap_or_else(|e| {
+                eprintln!("sign: cannot write token: {e}");
+                process::exit(2);
+            });
+        }
+        Err(e) => {
+            eprintln!("sign: {e}");
+            process::exit(2);
+        }
+    }
+}
+
+fn signing_key_from_value(value: &Value) -> Result<(Alg, Vec<u8>), String> {
+    if value.as_object().is_none() {
+        return Err("key must be a JSON object".into());
+    }
+    let alg_name = value
+        .get("alg")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "key: alg must be a string".to_string())?;
+    let alg = Alg::from_name(alg_name).ok_or_else(|| format!("key: unknown alg {alg_name:?}"))?;
+    let pkcs8_b64 = value
+        .get("pkcs8")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "key: pkcs8 must be a string".to_string())?;
+    let pkcs8 = b64url::decode(pkcs8_b64).map_err(|_| "key: pkcs8 is not valid base64url".to_string())?;
+    Ok((alg, pkcs8))
+}
+
 fn public_jwk(public: &PublicKey, kid: &str) -> String {
     match public {
         PublicKey::Ed25519 { x } => format!(
@@ -243,9 +345,9 @@ fn expect_value(cmd: &str, args: &[String], i: usize, flag: &str) -> String {
     }
 }
 
-fn read_file(path: &PathBuf, label: &str) -> Vec<u8> {
+fn read_file(cmd: &str, path: &PathBuf, label: &str) -> Vec<u8> {
     fs::read(path).unwrap_or_else(|e| {
-        eprintln!("verify: cannot read {label} {}: {e}", path.display());
+        eprintln!("{cmd}: cannot read {label} {}: {e}", path.display());
         process::exit(2);
     })
 }
