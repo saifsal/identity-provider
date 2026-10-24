@@ -1,7 +1,7 @@
 //! Command-line front end for the `jose` library.
 //!
 //! Exit codes:
-//! - `0` — success (`verify` accepted the token, `keygen` wrote a key, or `sign` wrote a token)
+//! - `0` — success (`verify` accepted the token, or `keygen` / `sign` / `jwks` wrote output)
 //! - `1` — `verify` rejected the token (verdict on stdout)
 //! - `2` — usage or configuration error (message on stderr, no verdict)
 
@@ -31,6 +31,7 @@ fn main() {
         "verify" => run_verify(&args[2..]),
         "keygen" => run_keygen(&args[2..]),
         "sign" => run_sign(&args[2..]),
+        "jwks" => run_jwks(&args[2..]),
         "help" | "--help" | "-h" => {
             usage(&args[0]);
             process::exit(0);
@@ -49,6 +50,7 @@ fn usage(bin: &str) {
   {bin} verify --jwks PATH --policy PATH [--token PATH|-]\n\
   {bin} keygen --alg EdDSA|ES256 [--kid KID]\n\
   {bin} sign --key PATH --header PATH --payload PATH\n\
+  {bin} jwks --key PATH [--key PATH ...]\n\
   {bin} help\n\
 \n\
 verify reads a compact JWS/JWT and prints a JSON verdict on stdout.\n\
@@ -61,7 +63,11 @@ omitted, kid is the RFC 7638 thumbprint. HS256 is verify-only.\n\
 \n\
 sign reads a keygen JSON object from --key, protected-header JSON from\n\
 --header, and payload JSON from --payload, then prints a compact JWS on\n\
-stdout with no trailing newline. HS256 is verify-only."
+stdout with no trailing newline. HS256 is verify-only.\n\
+\n\
+jwks builds a JWKS document from one or more --key files. Each file is a\n\
+keygen JSON object (uses its jwk member) or a bare JWK object. The result\n\
+is validated with the same parser verify uses, then printed on stdout."
     );
 }
 
@@ -292,6 +298,81 @@ fn run_sign(args: &[String]) {
     }
 }
 
+fn run_jwks(args: &[String]) {
+    let mut key_paths: Vec<PathBuf> = Vec::new();
+
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--key" => {
+                i += 1;
+                key_paths.push(expect_path("jwks", args, i, "--key"));
+            }
+            other => {
+                eprintln!("jwks: unexpected argument {:?}", other);
+                process::exit(2);
+            }
+        }
+        i += 1;
+    }
+
+    if key_paths.is_empty() {
+        eprintln!("jwks: missing --key");
+        process::exit(2);
+    }
+
+    let mut jwks = String::from(r#"{"keys":["#);
+    for (index, path) in key_paths.iter().enumerate() {
+        let bytes = read_file("jwks", path, "key");
+        let value = match json::parse(&bytes) {
+            Ok(v) => v,
+            Err(e) => {
+                eprintln!("jwks: key {} is not valid JSON: {e}", path.display());
+                process::exit(2);
+            }
+        };
+        let jwk = match jwk_from_key_file(&value) {
+            Ok(j) => j,
+            Err(msg) => {
+                eprintln!("jwks: key {}: {msg}", path.display());
+                process::exit(2);
+            }
+        };
+        if index > 0 {
+            jwks.push(',');
+        }
+        write_json(jwk, &mut jwks);
+    }
+    jwks.push_str("]}");
+
+    if let Err(e) = Jwks::parse(jwks.as_bytes()) {
+        eprintln!("jwks: {e}");
+        process::exit(2);
+    }
+
+    println!("{jwks}");
+}
+
+fn jwk_from_key_file(value: &Value) -> Result<&Value, String> {
+    if value.as_object().is_none() {
+        return Err("must be a JSON object".into());
+    }
+    let jwk = if let Some(jwk) = value.get("jwk") {
+        if jwk.as_object().is_none() {
+            return Err("jwk must be a JSON object".into());
+        }
+        jwk
+    } else if value.get("kty").and_then(Value::as_str).is_some() {
+        value
+    } else {
+        return Err("expected a keygen object with jwk, or a bare JWK with kty".into());
+    };
+    match jwk.get("kid").and_then(Value::as_str) {
+        Some(kid) if !kid.is_empty() => Ok(jwk),
+        _ => Err("jwk kid must be a non-empty string".into()),
+    }
+}
+
 fn signing_key_from_value(value: &Value) -> Result<(Alg, Vec<u8>), String> {
     if value.as_object().is_none() {
         return Err("key must be a JSON object".into());
@@ -307,6 +388,40 @@ fn signing_key_from_value(value: &Value) -> Result<(Alg, Vec<u8>), String> {
         .ok_or_else(|| "key: pkcs8 must be a string".to_string())?;
     let pkcs8 = b64url::decode(pkcs8_b64).map_err(|_| "key: pkcs8 is not valid base64url".to_string())?;
     Ok((alg, pkcs8))
+}
+
+fn write_json(value: &Value, out: &mut String) {
+    match value {
+        Value::Null => out.push_str("null"),
+        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        Value::Number(n) => match n {
+            json::Number::Int(i) => out.push_str(&i.to_string()),
+            json::Number::Other(s) => out.push_str(s),
+        },
+        Value::String(s) => out.push_str(&json_string(s)),
+        Value::Array(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                write_json(item, out);
+            }
+            out.push(']');
+        }
+        Value::Object(members) => {
+            out.push('{');
+            for (i, (name, member)) in members.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                out.push_str(&json_string(name));
+                out.push(':');
+                write_json(member, out);
+            }
+            out.push('}');
+        }
+    }
 }
 
 fn public_jwk(public: &PublicKey, kid: &str) -> String {
