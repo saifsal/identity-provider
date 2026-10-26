@@ -151,6 +151,50 @@ fn verify_matches_shared_vectors() {
 }
 
 #[test]
+fn non_string_policy_constraints_are_configuration_errors() {
+    let tmp = std::env::temp_dir().join(format!(
+        "jose-cli-policy-type-{}",
+        std::process::id()
+    ));
+    fs::create_dir_all(&tmp).expect("temp dir");
+    let jwks_file = tmp.join("jwks.json");
+    fs::write(&jwks_file, br#"{"keys":[]}"#).expect("write jwks");
+
+    let cases: &[(&str, &[u8])] = &[
+        (
+            "aud",
+            br#"{"algs":["EdDSA"],"now":0,"aud":["api"]}"#,
+        ),
+        ("iss", br#"{"algs":["EdDSA"],"now":0,"iss":null}"#),
+        ("typ", br#"{"algs":["EdDSA"],"now":0,"typ":1}"#),
+    ];
+    for (name, policy) in cases {
+        let policy_file = tmp.join(format!("{name}.json"));
+        fs::write(&policy_file, policy).expect("write policy");
+        let output = Command::new(bin())
+            .args([
+                "verify",
+                "--jwks",
+                jwks_file.to_str().unwrap(),
+                "--policy",
+                policy_file.to_str().unwrap(),
+                "--token",
+                "a.b.c",
+            ])
+            .output()
+            .expect("run");
+        assert_eq!(output.status.code(), Some(2), "{name}");
+        assert!(output.stdout.is_empty(), "{name}");
+        let stderr = String::from_utf8(output.stderr).unwrap();
+        assert!(
+            stderr.contains(&format!("{name} must be a string")),
+            "{name}: {stderr}"
+        );
+    }
+    let _ = fs::remove_dir_all(&tmp);
+}
+
+#[test]
 fn jwks_configuration_error_exits_two() {
     let tmp = std::env::temp_dir().join("jose-cli-config-err");
     fs::create_dir_all(&tmp).expect("temp dir");

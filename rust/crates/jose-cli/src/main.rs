@@ -536,13 +536,25 @@ fn policy_from_value(value: &Value, label: &str) -> Result<Policy, String> {
 
     Ok(Policy {
         algorithms,
-        issuer: value.get("iss").and_then(Value::as_str).map(str::to_owned),
-        audience: value.get("aud").and_then(Value::as_str).map(str::to_owned),
+        issuer: optional_string_field(value, "iss", label)?,
+        audience: optional_string_field(value, "aud", label)?,
         now,
         leeway,
-        typ: value.get("typ").and_then(Value::as_str).map(str::to_owned),
+        typ: optional_string_field(value, "typ", label)?,
         max_token_bytes,
     })
+}
+
+/// `iss`, `aud`, and `typ` are optional, but a present value must be a string.
+///
+/// Ignoring any other JSON type would skip that check. `"aud": ["api"]` would
+/// then accept every audience.
+fn optional_string_field(value: &Value, name: &str, label: &str) -> Result<Option<String>, String> {
+    match value.get(name) {
+        None => Ok(None),
+        Some(Value::String(s)) => Ok(Some(s.clone())),
+        Some(_) => Err(format!("{label}: {name} must be a string")),
+    }
 }
 
 fn integer_field(value: &Value, name: &str, label: &str) -> Result<i64, String> {

@@ -83,7 +83,7 @@ cargo test --workspace
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-All three succeeded on `rustc 1.99.0` (`cargo +stable` from `rust/`). `cargo test --workspace` ran 70 unit tests, 8 integration tests in `tests/thumbprint.rs`, 2 tests in `tests/vectors.rs` (the shared-vector run, plus the RFC signature check), 12 integration tests in `jose-cli` (`tests/verify.rs`, `tests/keygen.rs`, `tests/sign.rs`, and `tests/jwks.rs`), and 0 doc-tests.
+All three succeeded on `rustc 1.99.1` (`cargo +stable` from `rust/`). `cargo test --workspace` ran 70 unit tests, 8 integration tests in `tests/thumbprint.rs`, 2 tests in `tests/vectors.rs` (the shared-vector run, plus the RFC signature check), 13 integration tests in `jose-cli` (`tests/verify.rs`, `tests/keygen.rs`, `tests/sign.rs`, and `tests/jwks.rs`), and 0 doc-tests.
 
 Run one integration test, or that test file:
 

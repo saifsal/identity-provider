@@ -119,7 +119,7 @@ cargo build -p jose-cli
 ./target/debug/jose-cli verify --jwks path/to/jwks.json --policy path/to/policy.json --token -
 ```
 
-`verify` prints a JSON verdict on stdout (`{"ok":true,"kid":"...","alg":"..."}` or `{"ok":false,"error":"..."}`). Exit code `0` means the token verified, `1` means it was rejected, and `2` means the JWKS or policy could not be loaded (configuration error, no verdict). Policy JSON uses the same field names as [`testvectors/schema.json`](testvectors/schema.json) (`algs`, `now`, and optional `iss`, `aud`, `leeway`, `typ`, `max_token_bytes`).
+`verify` prints a JSON verdict on stdout (`{"ok":true,"kid":"...","alg":"..."}` or `{"ok":false,"error":"..."}`). Exit code `0` means the token verified, `1` means it was rejected, and `2` means the JWKS or policy could not be loaded (configuration error, no verdict). Policy JSON uses the same field names as [`testvectors/schema.json`](testvectors/schema.json) (`algs`, `now`, and optional `iss`, `aud`, `leeway`, `typ`, `max_token_bytes`). When `iss`, `aud`, or `typ` is present it must be a JSON string. Any other type, including `null` or an array, is a configuration error, so a mistyped audience or issuer cannot turn that check off.
 
 `keygen` prints one JSON object on stdout and exits `0`. `2` is a usage error, with the message on stderr and no JSON. `--alg` is `EdDSA` or `ES256`. `HS256` is rejected. `pkcs8` is the unpadded base64url encoding of a PKCS#8 v2 private key, and `jwk` is the public key. Without `--kid`, `kid` is the RFC 7638 thumbprint of that public key.
 
@@ -168,7 +168,7 @@ cargo test --workspace
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-`cargo test --workspace` passed on `rustc 1.99.0`: 70 unit tests in `jose`, 8 tests in `tests/thumbprint.rs`, 2 tests in `tests/vectors.rs` (the shared-vector run, plus a check of the RFC signatures that stop at `key_not_found`), 12 integration tests in `jose-cli`, and no doc-tests. Clippy with `-D warnings` passed on the same toolchain.
+`cargo test --workspace` passed on `rustc 1.99.1`: 70 unit tests in `jose`, 8 tests in `tests/thumbprint.rs`, 2 tests in `tests/vectors.rs` (the shared-vector run, plus a check of the RFC signatures that stop at `key_not_found`), 13 integration tests in `jose-cli`, and no doc-tests. Clippy with `-D warnings` passed on the same toolchain.
 
 The shared vectors under `testvectors/` run against the Rust verifier as one integration test (it loops over every case; rejections must match on the exact error code):
 

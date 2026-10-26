@@ -107,6 +107,14 @@ fn write_json_string(s: &str, out: &mut String) {
     out.push('"');
 }
 
+fn optional_policy_string(value: &Value, name: &str, case: &str) -> Option<String> {
+    match value.get(name) {
+        None => None,
+        Some(Value::String(s)) => Some(s.clone()),
+        Some(_) => panic!("{case}: policy.{name} must be a string"),
+    }
+}
+
 fn policy_from(value: &Value, case: &str) -> Policy {
     let algorithms = value
         .get("algs")
@@ -120,14 +128,14 @@ fn policy_from(value: &Value, case: &str) -> Policy {
         .collect();
     Policy {
         algorithms,
-        issuer: value.get("iss").and_then(Value::as_str).map(str::to_owned),
-        audience: value.get("aud").and_then(Value::as_str).map(str::to_owned),
+        issuer: optional_policy_string(value, "iss", case),
+        audience: optional_policy_string(value, "aud", case),
         now: integer(value, "now", case),
         leeway: value
             .get("leeway")
             .map(|v| u64::try_from(v.as_i64().expect("leeway is an integer")).expect("leeway >= 0"))
             .unwrap_or(0),
-        typ: value.get("typ").and_then(Value::as_str).map(str::to_owned),
+        typ: optional_policy_string(value, "typ", case),
         max_token_bytes: value
             .get("max_token_bytes")
             .map(|v| {
