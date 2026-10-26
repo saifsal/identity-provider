@@ -1,7 +1,7 @@
 {
   "id": "neg-b64-noncanonical-payload",
   "source": "generated",
-  "description": "Rejects a validly signed token whose payload segment has non-zero trailing base64url bits.",
+  "description": "Rejects a validly signed token whose payload segment has non-canonical trailing bits.",
   "jwks": {
     "keys": [
       {

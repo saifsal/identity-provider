@@ -6,6 +6,7 @@ This directory is the M0 verifier contract described by
 - `schema.json` defines the vector schema.
 - `rfc/` is for vectors copied from RFC text.
 - `generated/` is for project-generated vectors (negative and boundary cases).
+  Regenerate with `jose-cli gen-vectors` from the repository root (see ADR 0002).
 
 Each case is one JSON file. The file name must equal the vector `id`.
 

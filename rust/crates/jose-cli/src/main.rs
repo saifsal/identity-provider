@@ -1,16 +1,18 @@
 //! Command-line front end for the `jose` library.
 //!
 //! Exit codes:
-//! - `0` — success (`verify` accepted the token, or `keygen` / `sign` / `jwks` wrote output)
+//! - `0` — success (`verify` accepted the token, or `keygen` / `sign` / `jwks` / `gen-vectors` wrote output)
 //! - `1` — `verify` rejected the token (verdict on stdout)
 //! - `2` — usage or configuration error (message on stderr, no verdict)
 
 #![forbid(unsafe_code)]
 
+mod gen_vectors;
+
 use std::env;
 use std::fs;
 use std::io::{self, Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process;
 
 use jose::alg::Alg;
@@ -32,6 +34,7 @@ fn main() {
         "keygen" => run_keygen(&args[2..]),
         "sign" => run_sign(&args[2..]),
         "jwks" => run_jwks(&args[2..]),
+        "gen-vectors" => run_gen_vectors(&args[2..]),
         "help" | "--help" | "-h" => {
             usage(&args[0]);
             process::exit(0);
@@ -51,6 +54,7 @@ fn usage(bin: &str) {
   {bin} keygen --alg EdDSA|ES256 [--kid KID]\n\
   {bin} sign --key PATH --header PATH --payload PATH\n\
   {bin} jwks --key PATH [--key PATH ...]\n\
+  {bin} gen-vectors [--out DIR]\n\
   {bin} help\n\
 \n\
 verify reads a compact JWS/JWT and prints a JSON verdict on stdout.\n\
@@ -67,8 +71,53 @@ stdout with no trailing newline. HS256 is verify-only.\n\
 \n\
 jwks builds a JWKS document from one or more --key files. Each file is a\n\
 keygen JSON object (uses its jwk member) or a bare JWK object. The result\n\
-is validated with the same parser verify uses, then printed on stdout."
+is validated with the same parser verify uses, then printed on stdout.\n\
+\n\
+gen-vectors writes the ADR 0003 generated vector set to --out (default\n\
+testvectors/generated). Generation is deterministic for EdDSA; the ES256\n\
+DER case is a fixed committed token."
     );
+}
+
+fn run_gen_vectors(args: &[String]) {
+    let mut out: Option<PathBuf> = None;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--out" => {
+                i += 1;
+                out = Some(expect_path("gen-vectors", args, i, "--out"));
+            }
+            other => {
+                eprintln!("gen-vectors: unexpected argument {:?}", other);
+                process::exit(2);
+            }
+        }
+        i += 1;
+    }
+
+    let out = out.unwrap_or_else(|| PathBuf::from("testvectors/generated"));
+    if !out.exists() {
+        if let Some(parent) = out.parent() {
+            if parent != Path::new("") && !parent.exists() {
+                eprintln!(
+                    "gen-vectors: {} does not exist; pass --out or run from the repository root",
+                    out.display()
+                );
+                process::exit(2);
+            }
+        }
+    }
+
+    match gen_vectors::run(&out) {
+        Ok(n) => {
+            eprintln!("gen-vectors: wrote {n} files to {}", out.display());
+        }
+        Err(e) => {
+            eprintln!("gen-vectors: {e}");
+            process::exit(2);
+        }
+    }
 }
 
 fn run_verify(args: &[String]) {

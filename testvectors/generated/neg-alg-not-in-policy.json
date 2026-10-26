@@ -6,7 +6,9 @@
     "keys": []
   },
   "policy": {
-    "algs": ["EdDSA"],
+    "algs": [
+      "EdDSA"
+    ],
     "now": 0
   },
   "token": "eyJhbGciOiJIUzI1NiIsImtpZCI6ImsxIn0.e30.AA",

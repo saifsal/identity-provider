@@ -1,7 +1,7 @@
 {
   "id": "neg-dup-key-payload",
   "source": "generated",
-  "description": "Rejects a validly signed token whose payload contains duplicate JSON member names.",
+  "description": "Rejects a validly signed token whose payload contains duplicate member names.",
   "jwks": {
     "keys": [
       {
