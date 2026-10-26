@@ -25,7 +25,7 @@ What `jose` does now:
 
 Cryptographic primitives come from [`ring`](https://github.com/briansmith/ring) 0.17. The JOSE layer around them is written in this crate. The crate root is `#![forbid(unsafe_code)]`.
 
-Out of scope for this layer, and not implemented: JWE, JWS JSON serialization, detached payloads, RSA, and SAML. The planned CLI, Zig verifier, Go harness, and OAuth server are described under [Project status and roadmap](#project-status-and-roadmap). There is no UI, so this repository has no screenshots.
+Out of scope for this layer, and not implemented: JWE, JWS JSON serialization, detached payloads, RSA, and SAML. The remaining `gen-vectors` subcommand, the Zig verifier, the Go harness, and the OAuth server are described under [Project status and roadmap](#project-status-and-roadmap). There is no UI, so this repository has no screenshots.
 
 ## Prerequisites
 
@@ -112,32 +112,41 @@ fn main() {
 
 `sign` signs already-encoded ASCII `header.payload` bytes and returns the raw signature. `sign_compact` builds the three-segment token. Both reject `HS256`.
 
-Build `jose-cli` with `cargo build --workspace`. Today it implements `verify`, `keygen`, `sign`, and `jwks`. `gen-vectors` is still planned.
+Build `jose-cli` with `cargo build -p jose-cli` (or `cargo build --workspace`). It implements `verify`, `keygen`, `sign`, and `jwks`. `gen-vectors` is still planned. `help`, `--help`, and `-h` print usage on stderr and exit `0`. An unknown subcommand prints that same usage and exits `2`.
+
+| Exit | Meaning |
+|---|---|
+| `0` | `verify` accepted the token, or `keygen` / `sign` / `jwks` wrote output. |
+| `1` | `verify` rejected the token. The verdict is on stdout. stderr is empty. |
+| `2` | Usage or configuration error. The message is on stderr. stdout is empty, including when `verify` could not load the JWKS or policy. |
+
+`keygen --alg EdDSA` or `--alg ES256` prints one JSON object and a trailing newline: `alg`, `pkcs8`, and `jwk`. `pkcs8` is the unpadded base64url encoding of a PKCS#8 v2 private key. `jwk` is only the public key (`OKP`/`Ed25519` with `x`, or `EC`/`P-256` with `x` and `y`) plus `kid`. Without `--kid`, `kid` is the RFC 7638 thumbprint. `--kid` must be non-empty; an empty value exits `2` with `keygen: --kid must be non-empty`. `--alg HS256` exits `2` with `keygen: HS256 is verify-only`. Keep the keygen file private. Do not commit it.
+
+`jwks --key` repeats for each input. A keygen file contributes its `jwk` member, so `pkcs8` is not copied. A bare JWK object is copied as itself. Every JWK needs a non-empty string `kid`. The document is then parsed with the same `Jwks::parse` that `verify` uses, and printed with a trailing newline. A duplicate `kid` exits `2` with `jwks: duplicate kid "..."`. A file that is neither a keygen object nor a JWK exits `2` with `expected a keygen object with jwk, or a bare JWK with kty`.
+
+`sign` reads the keygen JSON from `--key` (it needs string `alg` and string `pkcs8`), the protected header from `--header`, and the payload from `--payload`. It prints a compact JWS on stdout with no trailing newline. `HS256` exits `2` with `sign: HS256 is verify-only`. Other signing failures also exit `2`, with the library message on stderr, for example `protected header alg does not match signing algorithm`, `protected header must be a valid JSON object with a string kid`, `critical protected-header parameters are unsupported`, and `payload must be a valid JSON object`.
+
+`verify` prints `{"ok":true,"kid":"...","alg":"..."}` or `{"ok":false,"error":"..."}`. Policy JSON uses the same field names as [`testvectors/schema.json`](testvectors/schema.json). `algs` (an array of algorithm names) and `now` (an integer) are required. Omitted `leeway` is `0` and omitted `max_token_bytes` is `8192`, matching the schema defaults. Omitted `iss`, `aud`, and `typ` are not checked. `--token` defaults to stdin; `-` is stdin as well.
+
+The four commands form one issuance path. This sequence was run with the debug build on `rustc 1.99.1`. `verify` exited `0` and printed `{"ok":true,"kid":"api-key","alg":"EdDSA"}`. `jwks.json` contained the public key only.
 
 ```bash
+cd rust
 cargo build -p jose-cli
-./target/debug/jose-cli verify --jwks path/to/jwks.json --policy path/to/policy.json --token -
+bin=./target/debug/jose-cli
+
+$bin keygen --alg EdDSA --kid api-key > key.json
+$bin jwks --key key.json > jwks.json
+printf '%s' '{"alg":"EdDSA","kid":"api-key"}' > header.json
+printf '%s' '{"iss":"issuer","aud":"api","exp":101}' > payload.json
+printf '%s\n' '{"algs":["EdDSA"],"iss":"issuer","aud":"api","now":100}' > policy.json
+$bin sign --key key.json --header header.json --payload payload.json > token.txt
+$bin verify --jwks jwks.json --policy policy.json --token token.txt
 ```
 
-`verify` prints a JSON verdict on stdout (`{"ok":true,"kid":"...","alg":"..."}` or `{"ok":false,"error":"..."}`). Exit code `0` means the token verified, `1` means it was rejected, and `2` means the JWKS or policy could not be loaded (configuration error, no verdict). Policy JSON uses the same field names as [`testvectors/schema.json`](testvectors/schema.json) (`algs`, `now`, and optional `iss`, `aud`, `leeway`, `typ`, `max_token_bytes`).
+`sign` base64url-encodes the header file and the payload file as given, including spaces and a trailing newline. The JSON parser accepts that whitespace, so a file written by `echo` or by `json.dump` (which inserts a space after `:` and `,`) still signs, and `verify` still accepts the token. The compact serialization is different from the `printf '%s'` files above. Ed25519 then signs those same bytes to the same token on a second run. ES256 does not: the header and payload segments stay the same and the signature segment changes, and both tokens verify. A protected header must be a JSON object whose string `alg` equals the key's `alg` and whose `kid` is a non-empty string. `crit` is rejected. The payload must be a JSON object. `sign` does not require `exp`. `verify` does, and it accepts `exp` and `nbf` only as integers. `"exp":"101"` and `{"exp":101.5}` sign successfully and then verify as `malformed`. With `now` equal to `exp` and `leeway` omitted, the verdict is `expired`. `now` of `101` and `leeway` of `1` accepts `exp` of `101`. When `exp` has passed and `nbf` is still in the future, the verdict is `expired`.
 
-`keygen` prints one JSON object on stdout and exits `0`. `2` is a usage error, with the message on stderr and no JSON. `--alg` is `EdDSA` or `ES256`. `HS256` is rejected. `pkcs8` is the unpadded base64url encoding of a PKCS#8 v2 private key, and `jwk` is the public key. Without `--kid`, `kid` is the RFC 7638 thumbprint of that public key.
-
-```bash
-./target/debug/jose-cli keygen --alg EdDSA
-```
-
-`sign` reads that keygen JSON from `--key`, plus protected-header and payload JSON files, and prints a compact JWS on stdout with no trailing newline. Exit `0` on success and `2` on usage or signing errors. `HS256` is rejected.
-
-```bash
-./target/debug/jose-cli sign --key key.json --header header.json --payload payload.json
-```
-
-`jwks` builds a JWKS document from one or more `--key` files (keygen JSON, using the `jwk` member, or a bare JWK). Each JWK needs a non-empty `kid`. The document is validated with the same parser `verify` uses, then printed on stdout. Exit `0` on success and `2` on usage or configuration errors (including duplicate `kid`).
-
-```bash
-./target/debug/jose-cli jwks --key key.json
-```
+`verify` compares the token bytes it was given. A trailing newline, from `echo` or from a line-oriented read, is not part of the compact serialization. The same token then exits `1` with `{"ok":false,"error":"malformed"}`. Piping the exact `token.txt` bytes to `--token -` succeeds. A policy file with no `now` exits `2` with `verify: policy file: missing now` and no verdict.
 
 ## Configuration
 
@@ -149,9 +158,9 @@ Nothing is read from the environment, a config file, or Cargo features. The call
 | `issuer` | When set, `iss` must equal this string. When omitted, `iss` is not checked. |
 | `audience` | When set, `aud` must be that string or an array of strings containing it. |
 | `now` | Verification time, Unix seconds. Expiry tests pass this in; the crate does not read the clock. |
-| `leeway` | Clock skew in seconds, applied to `exp` and `nbf`. |
+| `leeway` | Clock skew in seconds, applied to `exp` and `nbf`. The Rust struct has no default. The vector schema and `jose-cli` both use `0` when the field is omitted. |
 | `typ` | When set, the header `typ` must match, case-insensitively, after removing one leading `application/`. `at+jwt` and `application/at+jwt` match. |
-| `max_token_bytes` | Tokens longer than this are `too_large`. The Rust struct has no default; the vector schema's default is 8192. |
+| `max_token_bytes` | Tokens longer than this are `too_large`. The Rust struct has no default. The vector schema and `jose-cli` both use `8192` when the field is omitted. |
 
 The same field names appear in [`testvectors/schema.json`](testvectors/schema.json) and are used by the checked-in vectors under `testvectors/generated/` and `testvectors/rfc/` (`iss`, `aud`, `algs`, `now`, `leeway`, `typ`, `max_token_bytes`). The RFC files are compact examples copied from RFC 7515 and RFC 8037. Several of those headers have no `kid`, so ADR 0003 rejects them with `key_not_found` before the signature is checked.
 
@@ -238,7 +247,7 @@ flowchart LR
 
 The Rust signer and the Rust verifier in that diagram exist as library functions. Generated vectors under `testvectors/generated/` and the RFC compact examples under `testvectors/rfc/` run against the Rust verifier (`cargo test -p jose --test vectors`). The Zig verifier and Go harness are still missing.
 
-No GitHub Actions workflow is checked in. ADR 0002 describes a future CI check that regenerates vectors and fails on a dirty tree. That check waits on the CLI and the vector files.
+No GitHub Actions workflow is checked in. ADR 0002 describes a future CI check that regenerates vectors and fails on a dirty tree. That check waits on `jose-cli gen-vectors`. The vector files are already in the tree.
 
 ### Security notes
 

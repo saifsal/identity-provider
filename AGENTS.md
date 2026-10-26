@@ -73,7 +73,7 @@ mise install
 
 ## Build, run and test
 
-There is no binary, server, or `cargo run` target. The crate is a library (`publish = false`) and is not published to crates.io.
+`jose` is a library (`publish = false`) and is not published to crates.io. The workspace also builds the `jose-cli` binary (`verify`, `keygen`, `sign`, and `jwks`). There is no server.
 
 From `rust/`, with stable Rust on `PATH`:
 
@@ -134,11 +134,11 @@ Local tooling that does exist:
 
 ## Gotchas
 
-- The tree is the source of truth for what runs. Design notes in the ADRs and the milestone table in the README describe Zig, Go, a CLI, and an authorization server that are not implemented.
+- The tree is the source of truth for what runs. Zig, Go, and the authorization server are not implemented. `jose-cli` implements `verify`, `keygen`, `sign`, and `jwks`. `gen-vectors` is not implemented.
 - `testvectors/generated/` holds the ADR 0003 minimum negative vector set and positive time-boundary cases. `testvectors/rfc/` holds compact examples copied from RFC 7515 and RFC 8037. Both are run against the Rust verifier by `tests/vectors.rs`. The examples whose headers have no `kid` expect `key_not_found`; their signature bytes are checked only by the Rust test `rfc_signatures_match_when_kid_is_absent`. Agreement from Zig/Go is still missing, so M0 conformance is not established. Unit tests are not a substitute for that suite; `docs/rfc-conformance.md` says so.
 - `docs/threat-model.md` is not in the repository.
 - Rust older than 1.88 does not compile `b64url.rs`. A default toolchain of 1.83 fails even though `Cargo.lock` resolves.
-- `cargo test` does not start a server. There is nothing to run.
+- `cargo test` does not start a server. The program to run is `jose-cli`, from `cargo build -p jose-cli`. `sign` encodes the header and payload files byte for byte, including whitespace and a trailing newline, and writes the compact token with no trailing newline. A newline on the token makes `verify` return `malformed`. `keygen` JSON contains `pkcs8`. `jwks` copies only the public `jwk` member.
 - `Jwks::parse` fails the whole document on bad JSON, a missing `keys` array, a non-object entry, a non-string `kid`, or a duplicate `kid`. An entry that is present but unusable (unknown `kty` or `crv`, bad base64url, wrong length, non-string `alg` or `use`, `oct` key under 32 bytes) stays in the set and can never be selected (`key_not_found`). Private members such as `d` are ignored.
 - `kid` is required. There is no try-every-key fallback. A key `alg` member must equal the header `alg`. If `alg` is absent, the key type decides: `OKP`/`Ed25519` is `EdDSA`, `EC`/`P-256` is `ES256`, `oct` is `HS256`. A `use` member must be `sig`.
 - `exp` is required. `nbf` is optional. When both the expiry and not-before checks fail, the error is `expired`. `typ` comparison strips one leading `application/` and then compares case-insensitively. `iss` and `aud` use exact string equality.
