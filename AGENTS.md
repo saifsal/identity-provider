@@ -4,7 +4,7 @@
 
 identity-provider is an educational OAuth 2.0 / OpenID Connect identity provider. Its purpose is to learn the protocols by implementing the layers underneath them (JOSE, token issuance, verification, and later the OAuth and OIDC flows) and to compare independent implementations of the same security-critical code with a shared test-vector contract. It has had no external review. It is not a production identity provider.
 
-Milestone M0 is in progress. The checked-in implementation is the Rust library crate `jose` at `rust/crates/jose`. That crate signs and verifies compact JWS/JWT payloads, parses JWK and JWKS documents, computes RFC 7638 thumbprints, and enforces the verifier rules in `docs/adr/0003-verifier-check-order.md`. Rust signing of EdDSA and ES256, including compact serialization, is implemented. Generated vectors covering the ADR 0003 minimum negative set and positive time-boundary cases now exist under `testvectors/generated/`. Compact RFC examples live under `testvectors/rfc/`. Still outstanding for M0: a Zig verifier and a Go differential harness. Later milestones (OAuth, OIDC, token lifecycle, authentication, control plane, federation) are planned and have no code yet.
+Milestone M0 is in progress. The checked-in Rust library crate `jose` at `rust/crates/jose` signs and verifies compact JWS/JWT payloads, parses JWK and JWKS documents, computes RFC 7638 thumbprints, and enforces the verifier rules in `docs/adr/0003-verifier-check-order.md`. Generated vectors covering the ADR 0003 minimum negative set and positive time-boundary cases live under `testvectors/generated/`; compact RFC examples under `testvectors/rfc/`. The Zig package at `zig/` has begun: a strict base64url codec matching the Rust rules. Still outstanding for M0: the rest of the Zig verifier and a Go differential harness. Later milestones (OAuth, OIDC, token lifecycle, authentication, control plane, federation) are planned and have no code yet.
 
 The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md). That document is the M0 scope, the evidence that exists today, and the completion rule: do not treat a behavior as conformant until shared vectors exercise it. Accepted decisions that constrain that work are in [`docs/adr/`](docs/adr/). The milestone list through M8 is in [`README.md`](README.md).
 
@@ -45,6 +45,13 @@ The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md)
 │       ├── tests/jwks.rs
 │       ├── tests/gen_vectors.rs
 │       └── tests/verify.rs                # runs jose-cli against testvectors/
+├── zig/
+│   ├── mise.toml                          # zig = "0.14.1"
+│   ├── build.zig
+│   ├── build.zig.zon                      # package jose 0.1.0
+│   └── src/
+│       ├── root.zig                       # module root
+│       └── b64url.zig                     # strict unpadded canonical base64url
 ├── testvectors/
 │   ├── generated/                         # ADR 0003 negative and boundary vectors
 │   ├── rfc/                               # compact examples copied from RFC 7515 and RFC 8037
@@ -54,7 +61,7 @@ The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md)
 └── AGENTS.md
 ```
 
-These paths are described in older notes and are not in the tree: `zig/`, `go/`, `docs/threat-model.md`, and `.github/workflows/`. When another language is added, give it its own `mise.toml` in that directory.
+These paths are described in older notes and are not in the tree: `go/`, `docs/threat-model.md`, and `.github/workflows/`. When another language is added, give it its own `mise.toml` in that directory.
 
 ## Setup
 
@@ -63,19 +70,20 @@ Prerequisites:
 - Rust stable, 1.88 or newer. `slice::as_chunks` is used in `rust/crates/jose/src/b64url.rs`. Rust 1.83 fails to compile the crate with `E0658` (`slice_as_chunks` still unstable). `rust/mise.toml` pins `rust = "stable"`.
 - A C compiler. The only crate dependency, `ring` 0.17, builds native code.
 - Network access on the first build, to fetch the crates.io packages locked in `rust/Cargo.lock`.
+- Zig 0.14.1 for the `zig/` package. `zig/mise.toml` pins `zig = "0.14.1"`.
 
 With [mise](https://mise.jdx.dev/) installed, from a shell where mise is activated:
 
 ```bash
-cd rust
-mise install
+cd rust && mise install
+cd ../zig && mise install
 ```
 
-`mise` was not installed in the environment used to check this repository. The build, test, and clippy commands below were run with rustup's stable toolchain (`rustc 1.99.0`) as `cargo +stable …` from `rust/`, because the default toolchain there was Rust 1.83.0. Use whichever `cargo` is actually stable 1.88 or newer. `cargo +stable` is only valid when rustup has a toolchain named `stable`.
+`mise` was not installed in the environment used to check this repository historically. The Rust commands below were run with rustup's stable toolchain (`rustc 1.99.0`) as `cargo +stable …` from `rust/` when the default was 1.83.0. Use whichever `cargo` is actually stable 1.88 or newer. The Zig commands were run with `mise exec --` from `zig/` (`zig 0.14.1`).
 
 ## Build, run and test
 
-There is no binary, server, or `cargo run` target. The crate is a library (`publish = false`) and is not published to crates.io.
+There is no server. The Rust crate is a library (`publish = false`) and is not published to crates.io. The Zig package is also a library so far.
 
 From `rust/`, with stable Rust on `PATH`:
 
@@ -86,6 +94,14 @@ cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 All three succeeded on `rustc 1.99.0` (`cargo +stable` from `rust/`). `cargo test --workspace` ran 70 unit tests, 8 integration tests in `tests/thumbprint.rs`, 2 tests in `tests/vectors.rs` (the shared-vector run, plus the RFC signature check), 14 integration tests in `jose-cli` (`tests/verify.rs`, `tests/keygen.rs`, `tests/sign.rs`, `tests/jwks.rs`, and `tests/gen_vectors.rs`), and 0 doc-tests.
+
+From `zig/`:
+
+```bash
+mise exec -- zig build test
+```
+
+That command succeeded on Zig 0.14.1 and runs the base64url unit tests.
 
 Run one integration test, or that test file:
 
@@ -136,7 +152,7 @@ Local tooling that does exist:
 
 ## Gotchas
 
-- The tree is the source of truth for what runs. Design notes in the ADRs and the milestone table in the README describe Zig, Go, a CLI, and an authorization server that are not implemented.
+- The tree is the source of truth for what runs. Design notes in the ADRs and the milestone table in the README describe a full Zig verifier, Go harness, and authorization server that are not fully implemented.
 - `testvectors/generated/` holds the ADR 0003 minimum negative vector set and positive time-boundary cases. `testvectors/rfc/` holds compact examples copied from RFC 7515 and RFC 8037. Both are run against the Rust verifier by `tests/vectors.rs`. The examples whose headers have no `kid` expect `key_not_found`; their signature bytes are checked only by the Rust test `rfc_signatures_match_when_kid_is_absent`. Agreement from Zig/Go is still missing, so M0 conformance is not established. Unit tests are not a substitute for that suite; `docs/rfc-conformance.md` says so.
 - `docs/threat-model.md` is not in the repository.
 - Rust older than 1.88 does not compile `b64url.rs`. A default toolchain of 1.83 fails even though `Cargo.lock` resolves.

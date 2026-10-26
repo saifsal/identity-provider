@@ -1,0 +1,13 @@
+.{
+    .name = .jose,
+    .version = "0.1.0",
+    .fingerprint = 0xf9efb848c785e2f, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.14.1",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "mise.toml",
+    },
+}
