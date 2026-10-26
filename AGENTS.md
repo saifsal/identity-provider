@@ -4,7 +4,7 @@
 
 identity-provider is an educational OAuth 2.0 / OpenID Connect identity provider. Its purpose is to learn the protocols by implementing the layers underneath them (JOSE, token issuance, verification, and later the OAuth and OIDC flows) and to compare independent implementations of the same security-critical code with a shared test-vector contract. It has had no external review. It is not a production identity provider.
 
-Milestone M0 is in progress. The checked-in Rust library crate `jose` at `rust/crates/jose` signs and verifies compact JWS/JWT payloads, parses JWK and JWKS documents, computes RFC 7638 thumbprints, and enforces the verifier rules in `docs/adr/0003-verifier-check-order.md`. Generated vectors covering the ADR 0003 minimum negative set and positive time-boundary cases live under `testvectors/generated/`; compact RFC examples under `testvectors/rfc/`. The Zig package at `zig/` has begun: a strict base64url codec matching the Rust rules. Still outstanding for M0: the rest of the Zig verifier and a Go differential harness. Later milestones (OAuth, OIDC, token lifecycle, authentication, control plane, federation) are planned and have no code yet.
+Milestone M0 is in progress. The checked-in Rust library crate `jose` at `rust/crates/jose` signs and verifies compact JWS/JWT payloads, parses JWK and JWKS documents, computes RFC 7638 thumbprints, and enforces the verifier rules in `docs/adr/0003-verifier-check-order.md`. Generated vectors covering the ADR 0003 minimum negative set and positive time-boundary cases live under `testvectors/generated/`; compact RFC examples under `testvectors/rfc/`. The Zig package at `zig/` has begun: strict base64url and JSON parsers matching the Rust rules (including duplicate-key rejection). Still outstanding for M0: the rest of the Zig verifier and a Go differential harness. Later milestones (OAuth, OIDC, token lifecycle, authentication, control plane, federation) are planned and have no code yet.
 
 The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md). That document is the M0 scope, the evidence that exists today, and the completion rule: do not treat a behavior as conformant until shared vectors exercise it. Accepted decisions that constrain that work are in [`docs/adr/`](docs/adr/). The milestone list through M8 is in [`README.md`](README.md).
 
@@ -51,7 +51,8 @@ The next step is written in [`docs/rfc-conformance.md`](docs/rfc-conformance.md)
 │   ├── build.zig.zon                      # package jose 0.1.0
 │   └── src/
 │       ├── root.zig                       # module root
-│       └── b64url.zig                     # strict unpadded canonical base64url
+│       ├── b64url.zig                     # strict unpadded canonical base64url
+│       └── json.zig                       # strict JSON (duplicate keys rejected)
 ├── testvectors/
 │   ├── generated/                         # ADR 0003 negative and boundary vectors
 │   ├── rfc/                               # compact examples copied from RFC 7515 and RFC 8037
@@ -101,7 +102,7 @@ From `zig/`:
 mise exec -- zig build test
 ```
 
-That command succeeded on Zig 0.14.1 and runs the base64url unit tests.
+That command succeeded on Zig 0.14.1 and runs the base64url and JSON unit tests.
 
 Run one integration test, or that test file:
 

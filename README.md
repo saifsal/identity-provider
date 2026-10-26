@@ -9,7 +9,7 @@ An educational OAuth 2.0 / OpenID Connect identity provider. The work checked in
 
 Most identity code calls a JOSE library and then implements OAuth on top. This repository builds the JOSE layer itself: strict base64url, strict JSON, JWK and JWKS handling, thumbprints, signatures, and the checks a verifier runs before it trusts a token. The longer-term aim is an authorization server, with the same verifier written more than once. A shared set of test vectors, specified in [`testvectors/schema.json`](testvectors/schema.json) and [`docs/adr/0002-vectors-are-the-contract.md`](docs/adr/0002-vectors-are-the-contract.md), is how disagreements between those implementations become failing tests.
 
-The library is the crate `jose` in [`rust/crates/jose`](rust/crates/jose). It is not published to crates.io (`publish = false`). The workspace also builds `jose-cli` with `verify`, `keygen`, `sign`, `jwks`, and `gen-vectors` subcommands. A Zig package at [`zig/`](zig/) has begun with the same strict base64url rules; the rest of that verifier is not written yet. There is no server.
+The library is the crate `jose` in [`rust/crates/jose`](rust/crates/jose). It is not published to crates.io (`publish = false`). The workspace also builds `jose-cli` with `verify`, `keygen`, `sign`, `jwks`, and `gen-vectors` subcommands. A Zig package at [`zig/`](zig/) has begun with the same strict base64url and JSON rules; the rest of that verifier is not written yet. There is no server.
 
 ## Features
 
@@ -184,7 +184,7 @@ From `zig/` with Zig 0.14.1:
 mise exec -- zig build test
 ```
 
-That runs the Zig library tests (strict base64url today).
+That runs the Zig library tests (strict base64url and JSON today).
 
 The shared vectors under `testvectors/` run against the Rust verifier as one integration test (it loops over every case; rejections must match on the exact error code):
 
@@ -213,7 +213,7 @@ Agent instructions for working in this repository live in [`AGENTS.md`](AGENTS.m
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M0** | JOSE: JWS signing and verification, JWK/JWKS, thumbprints, shared test vectors | In progress. The Rust `jose` library, ADR 0003 generated vectors (also writable by `jose-cli gen-vectors`), the RFC compact examples under `testvectors/rfc/`, and the full `jose-cli` surface are in the tree. The Zig package has a matching base64url codec; the rest of that verifier and the Go harness are not. |
+| **M0** | JOSE: JWS signing and verification, JWK/JWKS, thumbprints, shared test vectors | In progress. The Rust `jose` library, ADR 0003 generated vectors (also writable by `jose-cli gen-vectors`), the RFC compact examples under `testvectors/rfc/`, and the full `jose-cli` surface are in the tree. The Zig package has matching base64url and JSON parsers; the rest of that verifier and the Go harness are not. |
 | M1 | OAuth 2.0 authorization code flow with PKCE | Planned |
 | M2 | OpenID Connect: ID tokens, discovery, userinfo | Planned |
 | M3 | Token lifecycle: refresh rotation, introspection, revocation, key rotation | Planned |
@@ -230,7 +230,7 @@ The intended shape, once M0 is filled in, is three implementations of one verifi
 | Language | Intended component | In this repository |
 |---|---|---|
 | Rust | JOSE signer and, later, the authorization server core | `rust/crates/jose` only. No authorization server. |
-| Zig | JOSE/JWT verifier, a C ABI, and a small edge-auth sidecar | `zig/`: strict base64url only so far |
+| Zig | JOSE/JWT verifier, a C ABI, and a small edge-auth sidecar | `zig/`: strict base64url and JSON so far |
 | Go | Control plane and the cross-implementation test harness | Not started |
 
 ```mermaid
@@ -252,7 +252,7 @@ flowchart LR
     verifiers --> harness{{"Go harness: do all verdicts match each other and the expectation?"}}
 ```
 
-The Rust signer and the Rust verifier in that diagram exist as library functions. Generated vectors under `testvectors/generated/` and the RFC compact examples under `testvectors/rfc/` run against the Rust verifier (`cargo test -p jose --test vectors`). The Zig package only has base64url so far; the Go harness is still missing.
+The Rust signer and the Rust verifier in that diagram exist as library functions. Generated vectors under `testvectors/generated/` and the RFC compact examples under `testvectors/rfc/` run against the Rust verifier (`cargo test -p jose --test vectors`). The Zig package has base64url and JSON so far; the Go harness is still missing.
 
 No GitHub Actions workflow is checked in. ADR 0002 describes a future CI check that regenerates vectors and fails on a dirty tree. That check waits on the CLI and the vector files.
 
