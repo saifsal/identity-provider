@@ -120,7 +120,45 @@ cargo build -p jose-cli
 ./target/debug/jose-cli verify --jwks path/to/jwks.json --policy path/to/policy.json --token -
 ```
 
-`verify` prints a JSON verdict on stdout (`{"ok":true,"kid":"...","alg":"..."}` or `{"ok":false,"error":"..."}`). Exit code `0` means the token verified, `1` means it was rejected, and `2` means the JWKS or policy could not be loaded (configuration error, no verdict). Policy JSON uses the same field names as [`testvectors/schema.json`](testvectors/schema.json) (`algs`, `now`, and optional `iss`, `aud`, `leeway`, `typ`, `max_token_bytes`).
+`--jwks` and `--policy` are required. `--token PATH` reads the compact token from a file; omitting `--token`, or passing `--token -`, reads it from stdin. Input is used byte-for-byte and is not trimmed, so pipe a token with `printf '%s'`, not `echo`: a trailing newline makes the compact serialization malformed.
+
+`verify` prints exactly one JSON verdict on stdout:
+
+- `{"ok":true,"kid":"...","alg":"..."}` and exit `0` when the token verifies.
+- `{"ok":false,"error":"..."}` and exit `1` when verification rejects the token. The error is one of the stable codes in [ADR 0003](docs/adr/0003-verifier-check-order.md).
+- No verdict and exit `2` for usage or configuration errors, including unreadable files, an invalid JWKS or policy, and empty stdin. The explanation is written to stderr.
+
+Policy JSON uses the field names from [`testvectors/schema.json`](testvectors/schema.json):
+
+| Field | Required | Constraint / default |
+|---|---|---|
+| `algs` | Yes | Array of `EdDSA`, `ES256`, or `HS256`. An empty array rejects every token. |
+| `now` | Yes | Integer Unix timestamp. The CLI does not read the system clock. |
+| `iss`, `aud`, `typ` | No | Strings. An omitted or non-string field is not checked. |
+| `leeway` | No | Non-negative integer seconds; defaults to `0`. |
+| `max_token_bytes` | No | Non-negative integer; defaults to `8192`. |
+
+To exercise the CLI with a committed positive vector, extract its three inputs and run the same path used by the integration test:
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+case = json.loads(Path("../testvectors/generated/pos-exp-one-second-ahead.json").read_text())
+Path("/tmp/jwks.json").write_text(json.dumps(case["jwks"]))
+Path("/tmp/policy.json").write_text(json.dumps(case["policy"]))
+Path("/tmp/token.jwt").write_text(case["token"])
+PY
+
+./target/debug/jose-cli verify \
+  --jwks /tmp/jwks.json \
+  --policy /tmp/policy.json \
+  --token /tmp/token.jwt
+# {"ok":true,"kid":"k1","alg":"EdDSA"}
+```
+
+Run this from `rust/`, after building the CLI. Python is only used to unpack the test-vector JSON; it is not a runtime dependency of `jose-cli`.
 
 `keygen` prints one JSON object on stdout and exits `0`. `2` is a usage error, with the message on stderr and no JSON. `--alg` is `EdDSA` or `ES256`. `HS256` is rejected. `pkcs8` is the unpadded base64url encoding of a PKCS#8 v2 private key, and `jwk` is the public key. Without `--kid`, `kid` is the RFC 7638 thumbprint of that public key.
 
