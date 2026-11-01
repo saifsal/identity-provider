@@ -9,7 +9,7 @@ An educational OAuth 2.0 / OpenID Connect identity provider. The work checked in
 
 Most identity code calls a JOSE library and then implements OAuth on top. This repository builds the JOSE layer itself: strict base64url, strict JSON, JWK and JWKS handling, thumbprints, signatures, and the checks a verifier runs before it trusts a token. The longer-term aim is an authorization server, with the same verifier written more than once. A shared set of test vectors, specified in [`testvectors/schema.json`](testvectors/schema.json) and [`docs/adr/0002-vectors-are-the-contract.md`](docs/adr/0002-vectors-are-the-contract.md), is how disagreements between those implementations become failing tests.
 
-The library is the crate `jose` in [`rust/crates/jose`](rust/crates/jose). It is not published to crates.io (`publish = false`). The workspace also builds `jose-cli` with `verify`, `keygen`, `sign`, and `jwks` subcommands. There is no server or other language implementation in the tree yet.
+The library is the crate `jose` in [`rust/crates/jose`](rust/crates/jose). It is not published to crates.io (`publish = false`). The workspace also builds `jose-cli` with `verify`, `keygen`, `sign`, `jwks`, and `gen-vectors` subcommands. A Zig package at [`zig/`](zig/) has begun with the same strict base64url and JSON rules; the rest of that verifier is not written yet. There is no server.
 
 ## Features
 
@@ -25,22 +25,23 @@ What `jose` does now:
 
 Cryptographic primitives come from [`ring`](https://github.com/briansmith/ring) 0.17. The JOSE layer around them is written in this crate. The crate root is `#![forbid(unsafe_code)]`.
 
-Out of scope for this layer, and not implemented: JWE, JWS JSON serialization, detached payloads, RSA, and SAML. The planned CLI, Zig verifier, Go harness, and OAuth server are described under [Project status and roadmap](#project-status-and-roadmap). There is no UI, so this repository has no screenshots.
+Out of scope for this layer, and not implemented: JWE, JWS JSON serialization, detached payloads, RSA, and SAML. The rest of the Zig verifier, the Go harness, and the OAuth server are described under [Project status and roadmap](#project-status-and-roadmap). There is no UI, so this repository has no screenshots.
 
 ## Prerequisites
 
 - Rust stable, 1.88 or newer. The base64url codec uses `slice::as_chunks`, which is unstable on Rust 1.83.
 - A C compiler, because `ring` builds native code.
 - Network access on the first build, to download the crates locked in [`rust/Cargo.lock`](rust/Cargo.lock).
+- Zig 0.14.1 to build [`zig/`](zig/). [`zig/mise.toml`](zig/mise.toml) pins `zig = "0.14.1"`.
 
 [`rust/mise.toml`](rust/mise.toml) pins `rust = "stable"`. With [mise](https://mise.jdx.dev/) activated:
 
 ```bash
-cd rust
-mise install
+cd rust && mise install
+cd ../zig && mise install
 ```
 
-The commands in the next sections were run with rustup stable (`rustc 1.99.0`) from `rust/`.
+The Rust commands in the next sections were run with rustup stable (`rustc 1.99.0`) from `rust/`. The Zig tests were run with `mise exec -- zig build test` from `zig/` (`zig 0.14.1`).
 
 ## Install
 
@@ -112,14 +113,52 @@ fn main() {
 
 `sign` signs already-encoded ASCII `header.payload` bytes and returns the raw signature. `sign_compact` builds the three-segment token. Both reject `HS256`.
 
-Build `jose-cli` with `cargo build --workspace`. Today it implements `verify`, `keygen`, `sign`, and `jwks`. `gen-vectors` is still planned.
+Build `jose-cli` with `cargo build --workspace`. Today it implements `verify`, `keygen`, `sign`, `jwks`, and `gen-vectors`.
 
 ```bash
 cargo build -p jose-cli
 ./target/debug/jose-cli verify --jwks path/to/jwks.json --policy path/to/policy.json --token -
 ```
 
-`verify` prints a JSON verdict on stdout (`{"ok":true,"kid":"...","alg":"..."}` or `{"ok":false,"error":"..."}`). Exit code `0` means the token verified, `1` means it was rejected, and `2` means the JWKS or policy could not be loaded (configuration error, no verdict). Policy JSON uses the same field names as [`testvectors/schema.json`](testvectors/schema.json) (`algs`, `now`, and optional `iss`, `aud`, `leeway`, `typ`, `max_token_bytes`). When `iss`, `aud`, or `typ` is present it must be a JSON string. Any other type, including `null` or an array, is a configuration error, so a mistyped audience or issuer cannot turn that check off.
+`--jwks` and `--policy` are required. `--token PATH` reads the compact token from a file; omitting `--token`, or passing `--token -`, reads it from stdin. Input is used byte-for-byte and is not trimmed, so pipe a token with `printf '%s'`, not `echo`: a trailing newline makes the compact serialization malformed.
+
+`verify` prints exactly one JSON verdict on stdout:
+
+- `{"ok":true,"kid":"...","alg":"..."}` and exit `0` when the token verifies.
+- `{"ok":false,"error":"..."}` and exit `1` when verification rejects the token. The error is one of the stable codes in [ADR 0003](docs/adr/0003-verifier-check-order.md).
+- No verdict and exit `2` for usage or configuration errors, including unreadable files, an invalid JWKS or policy, and empty stdin. The explanation is written to stderr.
+
+Policy JSON uses the field names from [`testvectors/schema.json`](testvectors/schema.json):
+
+| Field | Required | Constraint / default |
+|---|---|---|
+| `algs` | Yes | Array of `EdDSA`, `ES256`, or `HS256`. An empty array rejects every token. |
+| `now` | Yes | Integer Unix timestamp. The CLI does not read the system clock. |
+| `iss`, `aud`, `typ` | No | Strings. Omitted fields are not checked; a present non-string value is a configuration error. |
+| `leeway` | No | Non-negative integer seconds; defaults to `0`. |
+| `max_token_bytes` | No | Non-negative integer; defaults to `8192`. |
+
+To exercise the CLI with a committed positive vector, extract its three inputs and run the same path used by the integration test:
+
+```bash
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+case = json.loads(Path("../testvectors/generated/pos-exp-one-second-ahead.json").read_text())
+Path("/tmp/jwks.json").write_text(json.dumps(case["jwks"]))
+Path("/tmp/policy.json").write_text(json.dumps(case["policy"]))
+Path("/tmp/token.jwt").write_text(case["token"])
+PY
+
+./target/debug/jose-cli verify \
+  --jwks /tmp/jwks.json \
+  --policy /tmp/policy.json \
+  --token /tmp/token.jwt
+# {"ok":true,"kid":"k1","alg":"EdDSA"}
+```
+
+Run this from `rust/`, after building the CLI. Python is only used to unpack the test-vector JSON; it is not a runtime dependency of `jose-cli`.
 
 `keygen` prints one JSON object on stdout and exits `0`. `2` is a usage error, with the message on stderr and no JSON. `--alg` is `EdDSA` or `ES256`. `HS256` is rejected. `pkcs8` is the unpadded base64url encoding of a PKCS#8 v2 private key, and `jwk` is the public key. Without `--kid`, `kid` is the RFC 7638 thumbprint of that public key.
 
@@ -137,6 +176,13 @@ cargo build -p jose-cli
 
 ```bash
 ./target/debug/jose-cli jwks --key key.json
+```
+
+`gen-vectors` writes the ADR 0003 generated vector set under `--out` (default `testvectors/generated`). Run it from the repository root. EdDSA cases are deterministic (RFC 8032 test-1 seed). The ES256 DER case is a fixed committed token. Exit `0` on success and `2` on usage errors.
+
+```bash
+./target/debug/jose-cli gen-vectors
+./target/debug/jose-cli gen-vectors --out testvectors/generated
 ```
 
 ## Configuration
@@ -168,7 +214,15 @@ cargo test --workspace
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-`cargo test --workspace` passed on `rustc 1.99.1`: 70 unit tests in `jose`, 8 tests in `tests/thumbprint.rs`, 2 tests in `tests/vectors.rs` (the shared-vector run, plus a check of the RFC signatures that stop at `key_not_found`), 13 integration tests in `jose-cli`, and no doc-tests. Clippy with `-D warnings` passed on the same toolchain.
+`cargo test --workspace` passed on `rustc 1.99.1`: 70 unit tests in `jose`, 8 tests in `tests/thumbprint.rs`, 2 tests in `tests/vectors.rs` (the shared-vector run, plus a check of the RFC signatures that stop at `key_not_found`), 17 integration tests in `jose-cli`, and no doc-tests. Clippy with `-D warnings` passed on the same toolchain.
+
+From `zig/` with Zig 0.14.1:
+
+```bash
+mise exec -- zig build test
+```
+
+That runs the Zig library tests (strict base64url and JSON today).
 
 The shared vectors under `testvectors/` run against the Rust verifier as one integration test (it loops over every case; rejections must match on the exact error code):
 
@@ -197,7 +251,7 @@ Agent instructions for working in this repository live in [`AGENTS.md`](AGENTS.m
 
 | Milestone | Scope | Status |
 |---|---|---|
-| **M0** | JOSE: JWS signing and verification, JWK/JWKS, thumbprints, shared test vectors | In progress. The Rust `jose` library, ADR 0003 generated vectors, the RFC compact examples under `testvectors/rfc/`, and `jose-cli verify`, `keygen`, `sign`, and `jwks` are in the tree. `gen-vectors`, the Zig verifier, and the Go harness are not. |
+| **M0** | JOSE: JWS signing and verification, JWK/JWKS, thumbprints, shared test vectors | In progress. The Rust `jose` library, ADR 0003 generated vectors (also writable by `jose-cli gen-vectors`), the RFC compact examples under `testvectors/rfc/`, and the full `jose-cli` surface are in the tree. The Zig package has matching base64url and JSON parsers; the rest of that verifier and the Go harness are not. |
 | M1 | OAuth 2.0 authorization code flow with PKCE | Planned |
 | M2 | OpenID Connect: ID tokens, discovery, userinfo | Planned |
 | M3 | Token lifecycle: refresh rotation, introspection, revocation, key rotation | Planned |
@@ -214,7 +268,7 @@ The intended shape, once M0 is filled in, is three implementations of one verifi
 | Language | Intended component | In this repository |
 |---|---|---|
 | Rust | JOSE signer and, later, the authorization server core | `rust/crates/jose` only. No authorization server. |
-| Zig | JOSE/JWT verifier, a C ABI, and a small edge-auth sidecar | Not started |
+| Zig | JOSE/JWT verifier, a C ABI, and a small edge-auth sidecar | `zig/`: strict base64url and JSON so far |
 | Go | Control plane and the cross-implementation test harness | Not started |
 
 ```mermaid
@@ -236,7 +290,7 @@ flowchart LR
     verifiers --> harness{{"Go harness: do all verdicts match each other and the expectation?"}}
 ```
 
-The Rust signer and the Rust verifier in that diagram exist as library functions. Generated vectors under `testvectors/generated/` and the RFC compact examples under `testvectors/rfc/` run against the Rust verifier (`cargo test -p jose --test vectors`). The Zig verifier and Go harness are still missing.
+The Rust signer and the Rust verifier in that diagram exist as library functions. Generated vectors under `testvectors/generated/` and the RFC compact examples under `testvectors/rfc/` run against the Rust verifier (`cargo test -p jose --test vectors`). The Zig package has base64url and JSON so far; the Go harness is still missing.
 
 No GitHub Actions workflow is checked in. ADR 0002 describes a future CI check that regenerates vectors and fails on a dirty tree. That check waits on the CLI and the vector files.
 

@@ -18,7 +18,7 @@
     ],
     "now": 100
   },
-  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjIwMH0.N93JNUSjUMZRTm2Ycqesy9jgFTQp7oplZcrAOxZGjRm_X2GGT82-J_ZMSVgK1aut23n0Yb2OE15uoQyotH7xDR",
+  "token": "eyJhbGciOiJFZERTQSIsImtpZCI6ImsxIn0.eyJleHAiOjIwMH0.N93JNUSjUMZRTm2Ycqesy9jgFTQp7oplZcrAOxZGjRm_X2GGT82-J_ZMSVgK1aut23n0Yb2OE15uoQyotH7xDP",
   "expect": {
     "ok": false,
     "error": "bad_signature"
