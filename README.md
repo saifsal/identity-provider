@@ -9,7 +9,7 @@ An educational OAuth 2.0 / OpenID Connect identity provider. The work checked in
 
 Most identity code calls a JOSE library and then implements OAuth on top. This repository builds the JOSE layer itself: strict base64url, strict JSON, JWK and JWKS handling, thumbprints, signatures, and the checks a verifier runs before it trusts a token. The longer-term aim is an authorization server, with the same verifier written more than once. A shared set of test vectors, specified in [`testvectors/schema.json`](testvectors/schema.json) and [`docs/adr/0002-vectors-are-the-contract.md`](docs/adr/0002-vectors-are-the-contract.md), is how disagreements between those implementations become failing tests.
 
-The library is the crate `jose` in [`rust/crates/jose`](rust/crates/jose). It is not published to crates.io (`publish = false`). The workspace also builds `jose-cli` with `verify`, `keygen`, `sign`, `jwks`, and `gen-vectors` subcommands. A Zig package at [`zig/`](zig/) has begun with the same strict base64url and JSON rules; the rest of that verifier is not written yet. There is no server.
+The library is the crate `jose` in [`rust/crates/jose`](rust/crates/jose). It is not published to crates.io (`publish = false`). The workspace also builds `jose-cli` with `verify`, `keygen`, `sign`, `jwks`, and `gen-vectors` subcommands. A Zig package at [`zig/`](zig/) implements the same strict base64url and JSON rules; its calls and rejection rules are in [Zig parsers](#zig-parsers). The rest of that verifier is not written yet. There is no server.
 
 ## Features
 
@@ -185,6 +185,78 @@ Run this from `rust/`, after building the CLI. Python is only used to unpack the
 ./target/debug/jose-cli gen-vectors --out testvectors/generated
 ```
 
+## Zig parsers
+
+[`zig/`](zig/) is the start of the second verifier. `src/root.zig` re-exports two modules, and nothing else:
+
+```zig
+pub const b64url = @import("b64url.zig");
+pub const json = @import("json.zig");
+```
+
+Those modules match `jose::b64url` and `jose::json` in [`rust/crates/jose`](rust/crates/jose). They do not sign, verify a compact JWS, or parse a JWK. `build.zig` compiles `src/root.zig` as a static library named `jose` and as the unit-test root. It calls `createModule`, not `addModule`, so another Zig package cannot `@import("jose")` yet. The unit tests call the functions from inside `zig/src/`.
+
+From `zig/`, with Zig 0.14.1 (`zig/mise.toml`):
+
+```bash
+mise exec -- zig build test
+```
+
+`encode`, `decode`, and `parse` take a `std.mem.Allocator` and return owned memory. Free an encoded or decoded slice with `allocator.free`. Call `value.deinit(allocator)` on a parsed value.
+
+### Base64url
+
+`b64url.encode` and `b64url.decode` use the RFC 4648 §5 alphabet (`A-Z`, `a-z`, `0-9`, `-`, `_`) with no padding, which is the JOSE encoding in RFC 7515 §2. `encodedLen` is the length of that encoding. `encode` fails only when the allocation fails (`OutOfMemory`). `decode` checks every character before it checks the length, matching the Rust decoder. The empty string encodes and decodes to an empty slice. The decoder is not constant-time. It is for token text, not secret key material.
+
+```zig
+const encoded = try b64url.encode(allocator, "foo");
+defer allocator.free(encoded);
+// "Zm9v"
+
+const decoded = try b64url.decode(allocator, "Zm9v");
+defer allocator.free(decoded);
+// "foo"
+```
+
+| Error | When |
+|---|---|
+| `InvalidCharacter` | A byte outside the URL-safe alphabet. `+`, `/`, `=`, and whitespace fail here, so `"Zg=="` is not a separate padding error. |
+| `InvalidLength` | The length is congruent to 1 modulo 4 (`"A"`, `"Zm9vY"`). No byte string encodes to that length. |
+| `NonCanonical` | Unused trailing bits of the last character are not zero. `"Zg"` is `"f"`; `"Zh"` is rejected. |
+| `OutOfMemory` | The allocator failed. |
+
+Zig's `DecodeError` does not carry a byte index. Rust's `InvalidCharacter` does.
+
+### JSON
+
+`json.parse` reads exactly one RFC 8259 value and returns an owned `json.Value`. Call `value.deinit(allocator)` when finished. Duplicate member names are `DuplicateKey` at every nesting level, compared after string unescaping, so `"a"` and `"\u0061"` are the same name, and so are `"a/b"` and `"a\/b"`. That is the ADR 0003 rule. Object members stay in source order.
+
+```zig
+const value = try json.parse(allocator, "{\"typ\":\"JWT\",\"alg\":\"HS256\"}");
+defer value.deinit(allocator);
+// value.get("alg").?.asStr() is "HS256"
+// value.get("kid") is null
+```
+
+`asStr`, `asArray`, `asObject`, and `asI64` return null for any other type. A JSON string `"1"` is not an integer, and a JSON number `1` is not a string. `get` returns null when the value is not an object or the name is absent.
+
+Numbers are not converted to floating point. A plain integer that fits in `i64` is `Number.int`, and `asI64` returns it. `-0` is the integer `0`. `1.0`, `1e3`, and an integer outside `i64` (`9223372036854775808`) are `Number.other` and keep the source text, so `asI64` is null. Callers that need an integer claim (`exp`, `nbf`) reject those forms. Leading zeros, a leading `+`, a trailing dot, and `_` separators are rejected.
+
+Whitespace around a value may only be space, tab, newline, or carriage return. A vertical tab, a non-breaking space, or a leading BOM is `Unexpected`. Comments and trailing commas are rejected.
+
+| Error | When |
+|---|---|
+| `InvalidUtf8` | The input is not UTF-8. |
+| `UnexpectedEnd` | The value or a string ends early, including an empty input. |
+| `Unexpected` | A byte that does not fit the grammar. |
+| `InvalidString` | A bad escape, a lone surrogate, or a raw control character inside a string. A surrogate pair (`\ud83d\ude00`) is one codepoint. |
+| `TrailingData` | Bytes after the first value (`1 2`, `{} {}`). |
+| `DuplicateKey` | The same member name twice, after unescaping. |
+| `TooDeep` | More than `json.max_depth` (32) nested arrays or objects. A nest of exactly 32 parses. |
+| `OutOfMemory` | The allocator failed. |
+
+Zig's `JsonError` does not carry a byte offset or the duplicate name. The Rust `JsonError` does.
+
 ## Configuration
 
 Nothing is read from the environment, a config file, or Cargo features. The caller passes a [`Policy`](rust/crates/jose/src/verify.rs) and a JWKS document.
@@ -292,7 +364,7 @@ flowchart LR
 
 The Rust signer and the Rust verifier in that diagram exist as library functions. Generated vectors under `testvectors/generated/` and the RFC compact examples under `testvectors/rfc/` run against the Rust verifier (`cargo test -p jose --test vectors`). The Zig package has base64url and JSON so far; the Go harness is still missing.
 
-No GitHub Actions workflow is checked in. ADR 0002 describes a future CI check that regenerates vectors and fails on a dirty tree. That check waits on the CLI and the vector files.
+No GitHub Actions workflow is checked in. ADR 0002 says CI should regenerate `testvectors/generated/` with `jose-cli gen-vectors` and fail if the tree changes. The generator and the committed vectors are in the repository; that workflow is not.
 
 ### Security notes
 

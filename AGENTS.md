@@ -154,6 +154,7 @@ Local tooling that does exist:
 ## Gotchas
 
 - The tree is the source of truth for what runs. Design notes in the ADRs and the milestone table in the README describe a full Zig verifier, Go harness, and authorization server that are not fully implemented.
+- The Zig package exports only `b64url` and `json` from `src/root.zig`. `build.zig` uses `createModule` and does not call `addModule`, so another package cannot `@import("jose")`. `encode` and `decode` return allocated slices. `json.parse` returns a `Value` the caller must `deinit`. Zig decode and JSON errors do not include the byte offset or the duplicate name that the Rust errors carry. The calls and the rejection table are in the README section "Zig parsers".
 - `testvectors/generated/` holds the ADR 0003 minimum negative vector set and positive time-boundary cases. `testvectors/rfc/` holds compact examples copied from RFC 7515 and RFC 8037. Both are run against the Rust verifier by `tests/vectors.rs`. The examples whose headers have no `kid` expect `key_not_found`; their signature bytes are checked only by the Rust test `rfc_signatures_match_when_kid_is_absent`. Agreement from Zig/Go is still missing, so M0 conformance is not established. Unit tests are not a substitute for that suite; `docs/rfc-conformance.md` says so.
 - `docs/threat-model.md` is not in the repository.
 - Rust older than 1.88 does not compile `b64url.rs`. A default toolchain of 1.83 fails even though `Cargo.lock` resolves.
